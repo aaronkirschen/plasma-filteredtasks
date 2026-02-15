@@ -31,20 +31,28 @@ PlasmaCore.ToolTipArea {
     // so un-rotate them here to fix that.
     rotation: Plasmoid.configuration.reverseMode && Plasmoid.formFactor === PlasmaCore.Types.Vertical ? 180 : 0
 
-    implicitHeight: inPopup
-                    ? LayoutMetrics.preferredHeightInPopup()
-                    : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
-                             LayoutMetrics.preferredMinHeight())
-    implicitWidth: tasksRoot.vertical
-        ? Math.max(LayoutMetrics.preferredMinWidth(), Math.min(LayoutMetrics.preferredMaxWidth(), tasksRoot.width / tasksRoot.plasmoid.configuration.maxStripes))
+    implicitHeight: passesFilter
+        ? (inPopup
+            ? LayoutMetrics.preferredHeightInPopup()
+            : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
+                     LayoutMetrics.preferredMinHeight()))
+        : 0
+    implicitWidth: passesFilter
+        ? (tasksRoot.vertical
+            ? Math.max(LayoutMetrics.preferredMinWidth(), Math.min(LayoutMetrics.preferredMaxWidth(), tasksRoot.width / tasksRoot.plasmoid.configuration.maxStripes))
+            : 0)
         : 0
 
-    Layout.fillWidth: true
-    Layout.fillHeight: !inPopup
-    Layout.maximumWidth: tasksRoot.vertical
-        ? -1
-        : ((model.IsLauncher && !tasks.iconsOnly) ? tasksRoot.height / taskList.rows : LayoutMetrics.preferredMaxWidth())
-    Layout.maximumHeight: tasksRoot.vertical ? LayoutMetrics.preferredMaxHeight() : -1
+    Layout.fillWidth: passesFilter
+    Layout.fillHeight: passesFilter && !inPopup
+    Layout.maximumWidth: passesFilter
+        ? (tasksRoot.vertical
+            ? -1
+            : ((model.IsLauncher && !tasks.iconsOnly) ? tasksRoot.height / taskList.rows : LayoutMetrics.preferredMaxWidth()))
+        : 0
+    Layout.maximumHeight: passesFilter
+        ? (tasksRoot.vertical ? LayoutMetrics.preferredMaxHeight() : -1)
+        : 0
 
     required property var model
     required property int index
@@ -53,6 +61,19 @@ PlasmaCore.ToolTipArea {
     readonly property int pid: model.AppPid
     readonly property string appName: model.AppName
     readonly property string appId: model.AppId.replace(/\.desktop/, '')
+    readonly property var allowedApps: {
+        var raw = Plasmoid.configuration.filterAppIds;
+        if (!raw || raw.trim() === "") return [];
+        return raw.split(",").map(function(s) { return s.trim(); });
+    }
+    readonly property bool passesFilter: {
+        if (allowedApps.length === 0) return true;
+        for (var i = 0; i < allowedApps.length; i++) {
+            if (allowedApps[i] === appId) return true;
+        }
+        return false;
+    }
+    visible: passesFilter
     readonly property bool isIcon: tasksRoot.iconsOnly || model.IsLauncher
     property bool toolTipOpen: false
     property bool inPopup: false

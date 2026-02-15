@@ -153,6 +153,10 @@
       <label> Spacing between icons in task manager. Margin is multiplied by this value.</label>
       <default>1</default>
     </entry>
+    <entry name="filterAppIds" type="String">
+      <label>Comma-separated list of application IDs to show (e.g. "firefox,org.kde.dolphin"). Empty means show all.</label>
+      <default></default>
+    </entry>
   </group>
 
 </kcfg>

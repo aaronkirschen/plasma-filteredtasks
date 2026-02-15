@@ -19,4 +19,9 @@ ConfigModel {
          icon: "preferences-desktop"
          source: "ConfigBehavior.qml"
     }
+    ConfigCategory {
+         name: i18n("Filter")
+         icon: "view-filter"
+         source: "ConfigFilter.qml"
+    }
 }
