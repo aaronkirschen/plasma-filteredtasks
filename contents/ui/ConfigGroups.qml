@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQml.Models
 import Qt.labs.folderlistmodel
 import Qt.labs.settings as LabSettings
 
@@ -22,12 +23,30 @@ KCMUtils.SimpleKCM {
 
     property var layoutItems: []
     property bool _loading: true
+    property bool collapsed: false
 
-    // Write config on every change so the Apply button activates immediately
+    // ── Layout model for DelegateModel ──
+    ListModel { id: layoutModel }
+
+    function rebuildLayoutModel() {
+        layoutModel.clear();
+        for (var i = 0; i < layoutItems.length; i++) {
+            layoutModel.append({origIndex: i});
+        }
+    }
+
+    function commitVisualOrder() {
+        var newItems = [];
+        for (var i = 0; i < visualModel.items.count; i++) {
+            var origIdx = visualModel.items.get(i).model.origIndex;
+            newItems.push(layoutItems[origIdx]);
+        }
+        layoutItems = newItems;
+    }
+
     onLayoutItemsChanged: {
         if (_loading) return;
         cfg_taskGroups = JSON.stringify(layoutItems);
-        // Sync filterAppIds for backward compat
         var allIds = [];
         for (var i = 0; i < layoutItems.length; i++) {
             var item = layoutItems[i];
@@ -38,6 +57,7 @@ KCMUtils.SimpleKCM {
             }
         }
         cfg_filterAppIds = allIds.join(",");
+        rebuildLayoutModel();
     }
 
     Component.onCompleted: {
@@ -52,6 +72,7 @@ KCMUtils.SimpleKCM {
         }
         layoutItems = parsed;
         _loading = false;
+        rebuildLayoutModel();
         scanDebounce.start();
     }
 
@@ -198,9 +219,22 @@ KCMUtils.SimpleKCM {
         Kirigami.Separator { Layout.fillWidth: true }
 
         // ── Panel layout heading ──
-        Kirigami.Heading {
-            level: 3
-            text: i18n("Panel Layout")
+        RowLayout {
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.Heading {
+                level: 3
+                text: i18n("Panel Layout")
+                Layout.fillWidth: true
+            }
+
+            QQC2.ToolButton {
+                icon.name: root.collapsed ? "view-list-details" : "view-list-tree"
+                text: root.collapsed ? i18n("Expand") : i18n("Compact")
+                display: QQC2.AbstractButton.TextBesideIcon
+                checked: root.collapsed
+                onClicked: root.collapsed = !root.collapsed
+            }
         }
         QQC2.Label {
             Layout.fillWidth: true
@@ -210,260 +244,143 @@ KCMUtils.SimpleKCM {
             opacity: 0.6
         }
 
-        // ── Layout item list ──
-        Repeater {
-            id: layoutRepeater
-            model: root.layoutItems.length
+        // ── Layout item list (ListView + DelegateModel) ──
+        DelegateModel {
+            id: visualModel
+            model: layoutModel
 
-            delegate: ColumnLayout {
-                id: itemDelegate
-                required property int index
+            delegate: Item {
+                id: delegateRoot
+                required property int origIndex
 
-                readonly property var itemData: root.layoutItems[index] || {}
+                readonly property var itemData: root.layoutItems[origIndex] || {}
                 readonly property bool isGroup: (itemData.type || "group") === "group"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property bool isUngrouped: isGroup && itemData.name === "__ungrouped"
 
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
+                property bool dragActive: card.handleArea.drag.active
 
-                // ════════════════════════════════════
-                // Spacer item card
-                // ════════════════════════════════════
-                Rectangle {
-                    visible: itemDelegate.isSpacer
-                    Layout.fillWidth: true
-                    implicitHeight: spacerContent.implicitHeight + Kirigami.Units.smallSpacing * 2
-                    color: "transparent"
-                    border.color: Qt.darker(Kirigami.Theme.backgroundColor, 1.08)
-                    border.width: 1
-                    radius: 4
+                width: layoutListView.width
+                height: content.implicitHeight + Kirigami.Units.smallSpacing
 
-                    RowLayout {
-                        id: spacerContent
-                        anchors.fill: parent
-                        anchors.margins: Kirigami.Units.smallSpacing
-                        spacing: Kirigami.Units.smallSpacing
+                z: dragActive ? 1000 : 0
 
-                        QQC2.ToolButton {
-                            icon.name: "go-up"
-                            enabled: itemDelegate.index > 0
-                            onClicked: {
-                                var items = root.layoutItems.slice();
-                                var tmp = items[itemDelegate.index];
-                                items[itemDelegate.index] = items[itemDelegate.index - 1];
-                                items[itemDelegate.index - 1] = tmp;
-                                root.layoutItems = items;
-                            }
-                        }
-                        QQC2.ToolButton {
-                            icon.name: "go-down"
-                            enabled: itemDelegate.index < root.layoutItems.length - 1
-                            onClicked: {
-                                var items = root.layoutItems.slice();
-                                var tmp = items[itemDelegate.index];
-                                items[itemDelegate.index] = items[itemDelegate.index + 1];
-                                items[itemDelegate.index + 1] = tmp;
-                                root.layoutItems = items;
-                            }
+                Item {
+                    id: content
+                    width: delegateRoot.width
+                    implicitHeight: card.implicitHeight
+                    height: implicitHeight
+
+                    opacity: delegateRoot.dragActive ? 0.85 : 1.0
+
+                    Drag.active: delegateRoot.dragActive
+                    Drag.source: delegateRoot
+                    Drag.hotSpot.x: width / 2
+                    Drag.hotSpot.y: Kirigami.Units.gridUnit
+
+                    StandardCard {
+                        id: card
+                        width: parent.width
+                        name: delegateRoot.isUngrouped ? i18n("Ungrouped") : (delegateRoot.itemData.name || "")
+                        nameEditable: !delegateRoot.isSpacer && !delegateRoot.isUngrouped
+                        icon: delegateRoot.isUngrouped ? "application-x-executable" : (delegateRoot.isSpacer ? "distribute-horizontal-x" : (delegateRoot.itemData.icon || "view-list-icons"))
+                        itemColor: delegateRoot.itemData.color || ""
+                        collapsed: root.collapsed
+                        collapsable: !delegateRoot.isSpacer && !delegateRoot.isUngrouped
+                        extraContentVisible: !root.collapsed && delegateRoot.isGroup && !delegateRoot.isUngrouped
+                        dragTarget: content
+                        upEnabled: delegateRoot.origIndex > 0
+                        downEnabled: delegateRoot.origIndex < root.layoutItems.length - 1
+                        outlineColor: delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor
+
+                        collapsedInfo: {
+                            var ids = delegateRoot.itemData.appIds || [];
+                            if (ids.length === 0) return "";
+                            var names = [];
+                            for (var i = 0; i < ids.length; i++) names.push(root.appDisplayName(ids[i]));
+                            return "(" + ids.length + " apps: " + names.join(", ") + ")";
                         }
 
-                        Kirigami.Icon {
-                            source: "spacer"
-                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                            opacity: 0.5
+                        onNameEdited: function(newName) {
+                            var items = root.layoutItems.slice();
+                            items[delegateRoot.origIndex] = Object.assign({}, items[delegateRoot.origIndex], {name: newName});
+                            root.layoutItems = items;
                         }
-                        QQC2.Label {
-                            text: i18n("Spacer")
-                            opacity: 0.7
+                        onDeleteClicked: {
+                            var items = root.layoutItems.slice();
+                            items.splice(delegateRoot.origIndex, 1);
+                            root.layoutItems = items;
                         }
-                        Item { Layout.fillWidth: true }
-                        QQC2.Label {
-                            text: i18n("Width:")
-                            opacity: 0.6
+                        onColorClicked: {
+                            colorDialog.targetIndex = delegateRoot.origIndex;
+                            colorDialog.selectedColor = delegateRoot.itemData.color || "#00000000";
+                            colorDialog.open();
                         }
-                        QQC2.SpinBox {
-                            from: 1; to: 128
-                            value: itemDelegate.itemData.width || 8
-                            onValueModified: {
-                                var items = root.layoutItems.slice();
-                                items[itemDelegate.index] = Object.assign({}, items[itemDelegate.index], {width: value});
-                                root.layoutItems = items;
-                            }
+                        onMoveUp: {
+                            var items = root.layoutItems.slice();
+                            var idx = delegateRoot.origIndex;
+                            var tmp = items[idx]; items[idx] = items[idx - 1]; items[idx - 1] = tmp;
+                            root.layoutItems = items;
                         }
-                        QQC2.Label {
-                            text: i18n("px")
-                            opacity: 0.5
+                        onMoveDown: {
+                            var items = root.layoutItems.slice();
+                            var idx = delegateRoot.origIndex;
+                            var tmp = items[idx]; items[idx] = items[idx + 1]; items[idx + 1] = tmp;
+                            root.layoutItems = items;
                         }
-                        Rectangle {
-                            width: 24; height: 24
-                            radius: 4
-                            color: itemDelegate.itemData.color || "transparent"
-                            border.color: Kirigami.Theme.textColor
-                            border.width: 1
 
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    colorDialog.targetIndex = itemDelegate.index;
-                                    colorDialog.selectedColor = itemDelegate.itemData.color || "#00000000";
-                                    colorDialog.open();
+                        handleArea.onReleased: { content.y = 0; root.commitVisualOrder(); }
+                        handleArea.onCanceled: { content.y = 0; }
+
+                        rightControls: [
+                            QQC2.Label {
+                                visible: delegateRoot.isSpacer
+                                text: i18n("Width:")
+                                opacity: 0.6
+                            },
+                            QQC2.SpinBox {
+                                visible: delegateRoot.isSpacer
+                                from: 1; to: 128
+                                value: delegateRoot.itemData.width || 8
+                                onValueModified: {
+                                    var items = root.layoutItems.slice();
+                                    items[delegateRoot.origIndex] = Object.assign({}, items[delegateRoot.origIndex], {width: value});
+                                    root.layoutItems = items;
                                 }
+                            },
+                            QQC2.Label {
+                                visible: delegateRoot.isSpacer
+                                text: i18n("px")
+                                opacity: 0.5
                             }
-                        }
-                        QQC2.ToolButton {
-                            icon.name: "edit-delete"
-                            QQC2.ToolTip.text: i18n("Remove spacer")
-                            QQC2.ToolTip.visible: hovered
-                            onClicked: {
-                                var items = root.layoutItems.slice();
-                                items.splice(itemDelegate.index, 1);
-                                root.layoutItems = items;
-                            }
-                        }
-                    }
-                }
+                        ]
 
-                // ════════════════════════════════════
-                // Group item card
-                // ════════════════════════════════════
-                Rectangle {
-                    visible: itemDelegate.isGroup
-                    Layout.fillWidth: true
-                    implicitHeight: groupContent.implicitHeight + Kirigami.Units.largeSpacing * 2
-                    color: itemDelegate.isUngrouped
-                        ? Qt.lighter(Kirigami.Theme.alternateBackgroundColor, 1.05)
-                        : Kirigami.Theme.alternateBackgroundColor
-                    border.color: itemDelegate.isUngrouped
-                        ? Kirigami.Theme.disabledTextColor
-                        : Qt.darker(Kirigami.Theme.backgroundColor, 1.1)
-                    border.width: 1
-                    radius: 6
-
-                    ColumnLayout {
-                        id: groupContent
-                        anchors.fill: parent
-                        anchors.margins: Kirigami.Units.largeSpacing
-                        spacing: Kirigami.Units.smallSpacing
-
-                        // Group header
+                        // App list
                         RowLayout {
+                            visible: (delegateRoot.itemData.appIds || []).length > 0
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing
 
-                            QQC2.ToolButton {
-                                icon.name: "go-up"
-                                enabled: itemDelegate.index > 0
+                            QQC2.Button {
+                                text: i18n("Add Apps...")
+                                icon.name: "list-add"
+                                Layout.alignment: Qt.AlignTop
                                 onClicked: {
-                                    var items = root.layoutItems.slice();
-                                    var tmp = items[itemDelegate.index];
-                                    items[itemDelegate.index] = items[itemDelegate.index - 1];
-                                    items[itemDelegate.index - 1] = tmp;
-                                    root.layoutItems = items;
+                                    root.pickerTargetGroup = delegateRoot.origIndex;
+                                    appPickerPopup.open();
                                 }
                             }
-                            QQC2.ToolButton {
-                                icon.name: "go-down"
-                                enabled: itemDelegate.index < root.layoutItems.length - 1
-                                onClicked: {
-                                    var items = root.layoutItems.slice();
-                                    var tmp = items[itemDelegate.index];
-                                    items[itemDelegate.index] = items[itemDelegate.index + 1];
-                                    items[itemDelegate.index + 1] = tmp;
-                                    root.layoutItems = items;
-                                }
-                            }
-
-                            // Group name / Ungrouped label
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 0
-
-                                QQC2.TextField {
-                                    Layout.fillWidth: true
-                                    visible: !itemDelegate.isUngrouped
-                                    text: itemDelegate.itemData.name || ""
-                                    placeholderText: i18n("Group name")
-                                    onEditingFinished: {
-                                        var items = root.layoutItems.slice();
-                                        items[itemDelegate.index] = Object.assign({}, items[itemDelegate.index], {name: text});
-                                        root.layoutItems = items;
-                                    }
-                                }
-                                RowLayout {
-                                    visible: itemDelegate.isUngrouped
-                                    spacing: Kirigami.Units.smallSpacing
-
-                                    Kirigami.Icon {
-                                        source: "view-list-icons"
-                                        Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                                        Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                                    }
-                                    ColumnLayout {
-                                        spacing: 0
-                                        QQC2.Label {
-                                            text: i18n("Ungrouped")
-                                            font.bold: true
-                                        }
-                                        QQC2.Label {
-                                            text: i18n("Shows all apps not assigned to a named group")
-                                            font: Kirigami.Theme.smallFont
-                                            opacity: 0.6
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Color picker
-                            Rectangle {
-                                width: 28; height: 28
-                                radius: 4
-                                color: itemDelegate.itemData.color || "transparent"
-                                border.color: Kirigami.Theme.textColor
-                                border.width: 1
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        colorDialog.targetIndex = itemDelegate.index;
-                                        colorDialog.selectedColor = itemDelegate.itemData.color || "#00000000";
-                                        colorDialog.open();
-                                    }
-                                }
-                            }
-
-                            // Delete group
-                            QQC2.ToolButton {
-                                icon.name: "edit-delete"
-                                QQC2.ToolTip.text: i18n("Delete group")
-                                QQC2.ToolTip.visible: hovered
-                                onClicked: {
-                                    var items = root.layoutItems.slice();
-                                    items.splice(itemDelegate.index, 1);
-                                    root.layoutItems = items;
-                                }
-                            }
-                        }
-
-                        // App list (only for named groups, not ungrouped)
-                        ColumnLayout {
-                            visible: !itemDelegate.isUngrouped
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
 
                             Flow {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
-                                visible: (itemDelegate.itemData.appIds || []).length > 0
 
                                 Repeater {
-                                    model: itemDelegate.itemData.appIds || []
+                                    model: delegateRoot.itemData.appIds || []
 
                                     Rectangle {
                                         required property int index
                                         required property string modelData
-
                                         width: chipRow.implicitWidth + Kirigami.Units.largeSpacing * 2
                                         height: chipRow.implicitHeight + Kirigami.Units.smallSpacing * 2
                                         radius: height / 2
@@ -473,7 +390,6 @@ KCMUtils.SimpleKCM {
                                             id: chipRow
                                             anchors.centerIn: parent
                                             spacing: Kirigami.Units.smallSpacing
-
                                             Kirigami.Icon {
                                                 source: root.appIconName(modelData)
                                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
@@ -491,7 +407,7 @@ KCMUtils.SimpleKCM {
                                                 implicitWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing * 2
                                                 implicitHeight: implicitWidth
                                                 onClicked: {
-                                                    var li = itemDelegate.index;
+                                                    var li = delegateRoot.origIndex;
                                                     var items = root.layoutItems.slice();
                                                     var ids = (items[li].appIds || []).slice();
                                                     ids.splice(index, 1);
@@ -503,17 +419,46 @@ KCMUtils.SimpleKCM {
                                     }
                                 }
                             }
+                        }
 
-                            QQC2.Button {
-                                text: i18n("Add Apps...")
-                                icon.name: "list-add"
-                                onClicked: {
-                                    root.pickerTargetGroup = itemDelegate.index;
-                                    appPickerPopup.open();
-                                }
+                        // Add Apps button (shown when no apps yet)
+                        QQC2.Button {
+                            visible: (delegateRoot.itemData.appIds || []).length === 0
+                            text: i18n("Add Apps...")
+                            icon.name: "list-add"
+                            onClicked: {
+                                root.pickerTargetGroup = delegateRoot.origIndex;
+                                appPickerPopup.open();
                             }
                         }
                     }
+                }
+
+                DropArea {
+                    anchors.fill: parent
+                    onEntered: drag => {
+                        var from = drag.source.DelegateModel.itemsIndex;
+                        var to = delegateRoot.DelegateModel.itemsIndex;
+                        if (from !== to)
+                            visualModel.items.move(from, to);
+                    }
+                }
+            }
+        }
+
+        ListView {
+            id: layoutListView
+            Layout.fillWidth: true
+            implicitHeight: contentHeight
+            interactive: false
+            model: visualModel
+            clip: false
+
+            displaced: Transition {
+                NumberAnimation {
+                    properties: "x,y"
+                    easing.type: Easing.OutQuad
+                    duration: 200
                 }
             }
         }
@@ -527,7 +472,7 @@ KCMUtils.SimpleKCM {
                 icon.name: "list-add"
                 onClicked: {
                     var items = root.layoutItems.slice();
-                    items.push({type: "group", name: i18n("New Group"), appIds: [], color: ""});
+                    items.push({type: "group", name: i18n("New Group"), icon: "view-list-icons", appIds: [], color: ""});
                     root.layoutItems = items;
                 }
             }
@@ -537,7 +482,7 @@ KCMUtils.SimpleKCM {
                 icon.name: "distribute-horizontal-x"
                 onClicked: {
                     var items = root.layoutItems.slice();
-                    items.push({type: "spacer", width: 8, color: ""});
+                    items.push({type: "spacer", name: "Spacer", width: 8, color: ""});
                     root.layoutItems = items;
                 }
             }
