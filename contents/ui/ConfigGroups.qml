@@ -27,6 +27,8 @@ KCMUtils.SimpleKCM {
     property int focusIndex: -1
     property var deletedItem: null
     property int deletedIndex: -1
+    property string draggedAppId: ""
+    property int dragSourceGroup: -1
 
     // ── Layout model for DelegateModel ──
     ListModel { id: layoutModel }
@@ -274,7 +276,7 @@ KCMUtils.SimpleKCM {
                 width: layoutListView.width
                 height: content.implicitHeight + Kirigami.Units.smallSpacing
 
-                z: dragActive ? 1000 : 0
+                z: dragActive ? 1000 : (root.dragSourceGroup === origIndex ? 999 : 0)
 
                 // Keyboard reorder
                 Timer {
@@ -322,6 +324,7 @@ KCMUtils.SimpleKCM {
 
                     Drag.active: delegateRoot.dragActive
                     Drag.source: delegateRoot
+                    Drag.keys: ["card"]
                     Drag.hotSpot.x: width / 2
                     Drag.hotSpot.y: Kirigami.Units.gridUnit
 
@@ -429,24 +432,62 @@ KCMUtils.SimpleKCM {
                                     model: delegateRoot.itemData.appIds || []
 
                                     Rectangle {
+                                        id: chipRect
                                         required property int index
                                         required property string modelData
                                         width: chipRow.implicitWidth + Kirigami.Units.largeSpacing * 2
                                         height: chipRow.implicitHeight + Kirigami.Units.smallSpacing * 2
                                         radius: height / 2
                                         color: Kirigami.Theme.highlightColor
+                                        opacity: chipDragArea.drag.active ? 0.7 : 1.0
+
+                                        Drag.active: chipDragArea.drag.active
+                                        Drag.keys: ["appChip"]
+                                        Drag.hotSpot.x: width / 2
+                                        Drag.hotSpot.y: height / 2
+
+                                        property real _origX: 0
+                                        property real _origY: 0
+
+                                        MouseArea {
+                                            id: chipDragArea
+                                            anchors.fill: parent
+                                            drag.target: chipRect
+                                            drag.axis: Drag.XAndYAxis
+                                            cursorShape: Qt.SizeAllCursor
+                                            preventStealing: true
+                                            onPressed: {
+                                                chipRect._origX = chipRect.x;
+                                                chipRect._origY = chipRect.y;
+                                                root.draggedAppId = chipRect.modelData;
+                                                root.dragSourceGroup = delegateRoot.origIndex;
+                                            }
+                                            onReleased: {
+                                                chipRect.Drag.drop();
+                                                chipRect.x = chipRect._origX;
+                                                chipRect.y = chipRect._origY;
+                                                root.draggedAppId = "";
+                                                root.dragSourceGroup = -1;
+                                            }
+                                        }
 
                                         RowLayout {
                                             id: chipRow
                                             anchors.centerIn: parent
                                             spacing: Kirigami.Units.smallSpacing
                                             Kirigami.Icon {
-                                                source: root.appIconName(modelData)
+                                                source: "handle-sort"
+                                                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                                opacity: 0.5
+                                            }
+                                            Kirigami.Icon {
+                                                source: root.appIconName(chipRect.modelData)
                                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                                                 Layout.preferredHeight: Kirigami.Units.iconSizes.small
                                             }
                                             QQC2.Label {
-                                                text: root.appDisplayName(modelData)
+                                                text: root.appDisplayName(chipRect.modelData)
                                                 color: Kirigami.Theme.highlightedTextColor
                                             }
                                             QQC2.ToolButton {
@@ -460,7 +501,7 @@ KCMUtils.SimpleKCM {
                                                     var li = delegateRoot.origIndex;
                                                     var items = root.layoutItems.slice();
                                                     var ids = (items[li].appIds || []).slice();
-                                                    ids.splice(index, 1);
+                                                    ids.splice(chipRect.index, 1);
                                                     items[li] = Object.assign({}, items[li], {appIds: ids});
                                                     root.layoutItems = items;
                                                 }
@@ -486,11 +527,42 @@ KCMUtils.SimpleKCM {
 
                 DropArea {
                     anchors.fill: parent
+                    keys: ["card"]
                     onEntered: drag => {
                         var from = drag.source.DelegateModel.itemsIndex;
                         var to = delegateRoot.DelegateModel.itemsIndex;
                         if (from !== to)
                             visualModel.items.move(from, to);
+                    }
+                }
+
+                DropArea {
+                    anchors.fill: parent
+                    keys: ["appChip"]
+                    enabled: delegateRoot.isGroup && !delegateRoot.isUngrouped
+                    onEntered: card.outlineColor = Kirigami.Theme.highlightColor
+                    onExited: card.outlineColor = Qt.binding(function() {
+                        return delegateRoot.activeFocus ? Kirigami.Theme.highlightColor : (delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor);
+                    })
+                    onDropped: drop => {
+                        card.outlineColor = Qt.binding(function() {
+                            return delegateRoot.activeFocus ? Kirigami.Theme.highlightColor : (delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor);
+                        });
+                        var appId = root.draggedAppId;
+                        var srcIdx = root.dragSourceGroup;
+                        var dstIdx = delegateRoot.origIndex;
+                        if (!appId || srcIdx < 0 || srcIdx === dstIdx) return;
+                        var items = root.layoutItems.slice();
+                        // Remove from source
+                        var srcIds = (items[srcIdx].appIds || []).slice();
+                        var ai = srcIds.indexOf(appId);
+                        if (ai >= 0) srcIds.splice(ai, 1);
+                        items[srcIdx] = Object.assign({}, items[srcIdx], {appIds: srcIds});
+                        // Add to target
+                        var dstIds = (items[dstIdx].appIds || []).slice();
+                        if (dstIds.indexOf(appId) < 0) dstIds.push(appId);
+                        items[dstIdx] = Object.assign({}, items[dstIdx], {appIds: dstIds});
+                        root.layoutItems = items;
                     }
                 }
             }
