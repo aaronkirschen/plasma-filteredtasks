@@ -25,6 +25,8 @@ KCMUtils.SimpleKCM {
     property bool _loading: true
     property bool collapsed: false
     property int focusIndex: -1
+    property var deletedItem: null
+    property int deletedIndex: -1
 
     // ── Layout model for DelegateModel ──
     ListModel { id: layoutModel }
@@ -352,9 +354,12 @@ KCMUtils.SimpleKCM {
                             root.layoutItems = items;
                         }
                         onDeleteClicked: {
+                            root.deletedItem = Object.assign({}, delegateRoot.itemData);
+                            root.deletedIndex = delegateRoot.origIndex;
                             var items = root.layoutItems.slice();
                             items.splice(delegateRoot.origIndex, 1);
                             root.layoutItems = items;
+                            undoTimer.restart();
                         }
                         onColorClicked: {
                             colorDialog.targetIndex = delegateRoot.origIndex;
@@ -556,6 +561,53 @@ KCMUtils.SimpleKCM {
                 var items = root.layoutItems.slice();
                 items[targetIndex] = Object.assign({}, items[targetIndex], {color: selectedColor.toString()});
                 root.layoutItems = items;
+            }
+        }
+    }
+
+    // ── Undo delete toast ──
+    Timer {
+        id: undoTimer
+        interval: 5000
+        onTriggered: { root.deletedItem = null; root.deletedIndex = -1; }
+    }
+
+    Rectangle {
+        id: undoToast
+        visible: root.deletedItem !== null
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Kirigami.Units.largeSpacing
+        width: undoRow.implicitWidth + Kirigami.Units.largeSpacing * 2
+        height: undoRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+        radius: 4
+        color: Kirigami.Theme.backgroundColor
+        border.color: Kirigami.Theme.disabledTextColor
+        border.width: 1
+
+        RowLayout {
+            id: undoRow
+            anchors.centerIn: parent
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label {
+                text: i18n("Deleted")
+                opacity: 0.7
+            }
+            QQC2.ToolButton {
+                text: i18n("Undo")
+                icon.name: "edit-undo"
+                onClicked: {
+                    if (root.deletedItem && root.deletedIndex >= 0) {
+                        var items = root.layoutItems.slice();
+                        var idx = Math.min(root.deletedIndex, items.length);
+                        items.splice(idx, 0, root.deletedItem);
+                        root.layoutItems = items;
+                    }
+                    root.deletedItem = null;
+                    root.deletedIndex = -1;
+                    undoTimer.stop();
+                }
             }
         }
     }
