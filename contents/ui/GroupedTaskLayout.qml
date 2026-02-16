@@ -133,11 +133,6 @@ Item {
         return null;
     }
 
-    function forceReparent() {
-        _returnAllTasksToTaskList();
-        reparentAllTasks();
-    }
-
     // ── Horizontal panel ──
     RowLayout {
         id: groupRow

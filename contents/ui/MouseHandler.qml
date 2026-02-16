@@ -83,15 +83,21 @@ DropArea {
             const insertAt = above.index;
 
             if (tasks.dragSource !== above && tasks.dragSource.index !== insertAt) {
+                const fromIndex = tasks.dragSource.index;
+
                 if (tasks.groupDialog) {
-                    tasksModel.move(tasks.dragSource.index, insertAt,
+                    tasksModel.move(fromIndex, insertAt,
                         tasksModel.makeModelIndex(tasks.groupDialog.visualParent.index));
                 } else {
-                    tasksModel.move(tasks.dragSource.index, insertAt);
+                    tasksModel.move(fromIndex, insertAt);
                 }
 
                 if (tasks.groupedMode) {
-                    tasks.groupedLayout.forceReparent();
+                    if (fromIndex < insertAt) {
+                        tasks.dragSource.stackAfter(above);
+                    } else {
+                        tasks.dragSource.stackBefore(above);
+                    }
                 }
 
                 ignoredItem = above;
