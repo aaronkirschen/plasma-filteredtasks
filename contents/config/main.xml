@@ -157,6 +157,24 @@
       <label>Comma-separated list of application IDs to show (e.g. "firefox,org.kde.dolphin"). Empty means show all.</label>
       <default></default>
     </entry>
+    <entry name="taskGroups" type="String">
+      <label>JSON array of layout items. Each item has a "type" field: "group" ({type,name,appIds,color}) or "spacer" ({type,width}). The special __ungrouped group shows all unassigned apps.</label>
+      <default></default>
+    </entry>
+    <entry name="groupAlignment" type="Enum">
+      <label>How groups are positioned within the panel: 0 = Left (fill, gap right), 1 = Right (fill, gap left), 2 = Center (fill, gap both), 3 = No Fill (shrink to content).</label>
+      <choices>
+        <choice name="Left"/>
+        <choice name="Right"/>
+        <choice name="Center"/>
+        <choice name="NoFill"/>
+      </choices>
+      <default>0</default>
+    </entry>
+    <entry name="exclusiveMode" type="Bool">
+      <label>When enabled, apps assigned to any group in this widget are hidden from other Filtered Task Manager instances.</label>
+      <default>true</default>
+    </entry>
   </group>
 
 </kcfg>

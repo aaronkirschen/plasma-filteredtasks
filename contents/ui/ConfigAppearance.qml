@@ -24,6 +24,7 @@ KCMUtils.SimpleKCM {
     property bool cfg_interactiveMute
     property bool cfg_tooltipControls
     property alias cfg_fill: fill.checked
+    property int cfg_groupAlignment: 0
     property alias cfg_maxStripes: maxStripes.value
     property alias cfg_forceStripes: forceStripes.checked
     property alias cfg_taskMaxWidth: taskMaxWidth.currentIndex
@@ -82,7 +83,21 @@ KCMUtils.SimpleKCM {
 
         QQC2.CheckBox {
             id: fill
+            visible: !iconOnly
             text: i18nc("@option:check section General", "Fill free space on panel")
+        }
+
+        QQC2.ComboBox {
+            visible: iconOnly
+            Kirigami.FormData.label: i18n("Panel space:")
+            model: [
+                i18n("Fill — align left"),
+                i18n("Fill — align right"),
+                i18n("Fill — align center"),
+                i18n("No fill — shrink to fit")
+            ]
+            currentIndex: cfg_groupAlignment
+            onActivated: cfg_groupAlignment = currentIndex
         }
 
         Item {

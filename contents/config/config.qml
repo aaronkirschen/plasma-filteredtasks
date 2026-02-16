@@ -20,8 +20,8 @@ ConfigModel {
          source: "ConfigBehavior.qml"
     }
     ConfigCategory {
-         name: i18n("Filter")
+         name: i18n("Groups")
          icon: "view-filter"
-         source: "ConfigFilter.qml"
+         source: "ConfigGroups.qml"
     }
 }

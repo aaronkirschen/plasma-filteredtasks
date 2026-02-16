@@ -34,13 +34,15 @@ PlasmaCore.ToolTipArea {
     implicitHeight: passesFilter
         ? (inPopup
             ? LayoutMetrics.preferredHeightInPopup()
-            : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
-                     LayoutMetrics.preferredMinHeight()))
+            : (tasksRoot.vertical && tasksRoot.groupedMode
+                ? LayoutMetrics.preferredMaxHeight()
+                : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
+                         LayoutMetrics.preferredMinHeight())))
         : 0
     implicitWidth: passesFilter
         ? (tasksRoot.vertical
             ? Math.max(LayoutMetrics.preferredMinWidth(), Math.min(LayoutMetrics.preferredMaxWidth(), tasksRoot.width / tasksRoot.plasmoid.configuration.maxStripes))
-            : 0)
+            : (tasksRoot.groupedMode ? LayoutMetrics.preferredMaxWidth() : 0))
         : 0
 
     Layout.fillWidth: passesFilter
@@ -61,12 +63,17 @@ PlasmaCore.ToolTipArea {
     readonly property int pid: model.AppPid
     readonly property string appName: model.AppName
     readonly property string appId: model.AppId.replace(/\.desktop/, '')
+    property int groupIndex: -1
+
+    // Flat filter for non-grouped mode; grouped mode controls visibility via reparenting
     readonly property var allowedApps: {
+        if (tasksRoot.groupedMode) return [];
         var raw = Plasmoid.configuration.filterAppIds;
         if (!raw || raw.trim() === "") return [];
         return raw.split(",").map(function(s) { return s.trim(); });
     }
     readonly property bool passesFilter: {
+        if (tasksRoot.groupedMode) return true;
         if (allowedApps.length === 0) return true;
         for (var i = 0; i < allowedApps.length; i++) {
             if (allowedApps[i] === appId) return true;
@@ -701,6 +708,12 @@ PlasmaCore.ToolTipArea {
         }
     ]
 
+    onAppIdChanged: {
+        if (completed && !inPopup && tasksRoot.groupedMode) {
+            tasksRoot.groupedLayout.reparentTask(task);
+        }
+    }
+
     Component.onCompleted: {
         if (!inPopup && model.IsWindow) {
             const component = Qt.createComponent("GroupExpanderOverlay.qml");
@@ -716,7 +729,10 @@ PlasmaCore.ToolTipArea {
     }
     Component.onDestruction: {
         if (moveAnim.running) {
-            (task.parent as TaskList).animationsRunning -= 1;
+            var taskListParent = task.parent as TaskList;
+            if (taskListParent) {
+                taskListParent.animationsRunning -= 1;
+            }
         }
     }
 }
