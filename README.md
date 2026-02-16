@@ -27,11 +27,6 @@ This widget is a fork of the stock KDE Plasma Icons-Only Task Manager.
 ```bash
 git clone https://github.com/aaronkirschen/plasma-filteredtasks.git
 cp -r plasma-filteredtasks ~/.local/share/plasma/plasmoids/org.kde.plasma.filteredtasks
-```
-
-Then restart Plasma:
-
-```bash
 kquitapp6 plasmashell && kstart plasmashell
 ```
 
@@ -45,8 +40,7 @@ kquitapp6 plasmashell && kstart plasmashell
 ### Uninstall
 
 ```bash
-rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.filteredtasks
-kquitapp6 plasmashell && kstart plasmashell
+rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.filteredtasks && kquitapp6 plasmashell && kstart plasmashell
 ```
 
 ## Configuration
