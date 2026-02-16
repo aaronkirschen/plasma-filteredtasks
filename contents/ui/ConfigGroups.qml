@@ -253,7 +253,7 @@ KCMUtils.SimpleKCM {
                 opacity: 0.6
             }
             QQC2.Label {
-                text: i18n("Tab to navigate, Alt+↑/↓ to reorder")
+                text: i18n("↑/↓ to navigate, Alt+↑/↓ to reorder")
                 font: Kirigami.Theme.smallFont
                 opacity: 0.6
             }
@@ -297,11 +297,11 @@ KCMUtils.SimpleKCM {
                             card.moveDown();
                             event.accepted = true;
                         }
-                    } else if (event.key === Qt.Key_Tab && origIndex < root.layoutItems.length - 1) {
+                    } else if (event.key === Qt.Key_Down && origIndex < root.layoutItems.length - 1) {
                         var next = layoutListView.itemAtIndex(origIndex + 1);
                         if (next) { next.forceActiveFocus(); root.focusIndex = origIndex + 1; }
                         event.accepted = true;
-                    } else if (event.key === Qt.Key_Backtab && origIndex > 0) {
+                    } else if (event.key === Qt.Key_Up && origIndex > 0) {
                         var prev = layoutListView.itemAtIndex(origIndex - 1);
                         if (prev) { prev.forceActiveFocus(); root.focusIndex = origIndex - 1; }
                         event.accepted = true;
