@@ -24,6 +24,7 @@ KCMUtils.SimpleKCM {
     property var layoutItems: []
     property bool _loading: true
     property bool collapsed: false
+    property int focusIndex: -1
 
     // ── Layout model for DelegateModel ──
     ListModel { id: layoutModel }
@@ -236,12 +237,20 @@ KCMUtils.SimpleKCM {
                 onClicked: root.collapsed = !root.collapsed
             }
         }
-        QQC2.Label {
-            Layout.fillWidth: true
-            text: i18n("Arrange groups and spacers in the order they appear on the panel.")
-            wrapMode: Text.WordWrap
-            font: Kirigami.Theme.smallFont
-            opacity: 0.6
+        RowLayout {
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: i18n("Arrange groups and spacers in the order they appear on the panel.")
+                wrapMode: Text.WordWrap
+                font: Kirigami.Theme.smallFont
+                opacity: 0.6
+            }
+            QQC2.Label {
+                text: i18n("Tab to navigate, Alt+↑/↓ to reorder")
+                font: Kirigami.Theme.smallFont
+                opacity: 0.6
+            }
         }
 
         // ── Layout item list (ListView + DelegateModel) ──
@@ -264,6 +273,42 @@ KCMUtils.SimpleKCM {
                 height: content.implicitHeight + Kirigami.Units.smallSpacing
 
                 z: dragActive ? 1000 : 0
+
+                // Keyboard reorder
+                Timer {
+                    interval: 1
+                    running: delegateRoot.origIndex === root.focusIndex
+                    onTriggered: delegateRoot.forceActiveFocus()
+                }
+                Keys.onPressed: event => {
+                    if (event.modifiers & Qt.AltModifier) {
+                        if (event.key === Qt.Key_Up && origIndex > 0) {
+                            root.focusIndex = origIndex - 1;
+                            card.moveUp();
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Down && origIndex < root.layoutItems.length - 1) {
+                            root.focusIndex = origIndex + 1;
+                            card.moveDown();
+                            event.accepted = true;
+                        }
+                    } else if (event.key === Qt.Key_Tab && origIndex < root.layoutItems.length - 1) {
+                        var next = layoutListView.itemAtIndex(origIndex + 1);
+                        if (next) { next.forceActiveFocus(); root.focusIndex = origIndex + 1; }
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Backtab && origIndex > 0) {
+                        var prev = layoutListView.itemAtIndex(origIndex - 1);
+                        if (prev) { prev.forceActiveFocus(); root.focusIndex = origIndex - 1; }
+                        event.accepted = true;
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onPressed: mouse => {
+                        delegateRoot.forceActiveFocus();
+                        root.focusIndex = delegateRoot.origIndex;
+                        mouse.accepted = false;
+                    }
+                }
 
                 Item {
                     id: content
@@ -291,7 +336,7 @@ KCMUtils.SimpleKCM {
                         dragTarget: content
                         upEnabled: delegateRoot.origIndex > 0
                         downEnabled: delegateRoot.origIndex < root.layoutItems.length - 1
-                        outlineColor: delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor
+                        outlineColor: delegateRoot.activeFocus ? Kirigami.Theme.highlightColor : (delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor)
 
                         collapsedInfo: {
                             var ids = delegateRoot.itemData.appIds || [];
