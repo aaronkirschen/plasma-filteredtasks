@@ -119,6 +119,25 @@ Item {
         _reparentTimer.restart();
     }
 
+    function taskAtPosition(x, y) {
+        var rep = tasks.vertical ? repeaterV : repeaterH;
+        for (var g = 0; g < rep.count; g++) {
+            var section = rep.itemAt(g);
+            if (!section || !section.isGroup) continue;
+            var flow = section.taskFlow;
+            if (!flow) continue;
+            var localPos = flow.mapFromItem(groupedLayout, x, y);
+            var child = flow.childAt(localPos.x, localPos.y);
+            if (child) return child;
+        }
+        return null;
+    }
+
+    function forceReparent() {
+        _returnAllTasksToTaskList();
+        reparentAllTasks();
+    }
+
     // ── Horizontal panel ──
     RowLayout {
         id: groupRow

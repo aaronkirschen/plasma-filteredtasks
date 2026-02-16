@@ -41,6 +41,9 @@ DropArea {
         let above;
         if (isGroupDialog) {
             above = target.itemAt(event.x, event.y);
+        } else if (tasks.groupedMode) {
+            var mapped = tasks.groupedLayout.mapFromItem(dropArea, event.x, event.y);
+            above = tasks.groupedLayout.taskAtPosition(mapped.x, mapped.y);
         } else {
             above = target.childAt(event.x, event.y);
         }
@@ -85,6 +88,10 @@ DropArea {
                         tasksModel.makeModelIndex(tasks.groupDialog.visualParent.index));
                 } else {
                     tasksModel.move(tasks.dragSource.index, insertAt);
+                }
+
+                if (tasks.groupedMode) {
+                    tasks.groupedLayout.forceReparent();
                 }
 
                 ignoredItem = above;
