@@ -1,6 +1,7 @@
 /*
     SPDX-FileCopyrightText: 2012-2016 Eike Hein <hein@kde.org>
     SPDX-FileCopyrightText: 2020 Nate Graham <nate@kde.org>
+    SPDX-FileCopyrightText: 2026 Aaron Kirschen <aaronkirschen@gmail.com>
 
     SPDX-License-Identifier: GPL-2.0-or-later
 */
@@ -28,7 +29,7 @@ function activateNextPrevTask(anchor, next, wheelSkipMinimized, wheelEnabled, ta
             return;
         }
 
-        // Single window
+        // Single window`
         if (windowCount === 1) {
             const isHidden = tasks.tasksModel.data(anchorModelIndex, TaskManager.AbstractTasksModel.IsHidden);
             if (!wheelSkipMinimized || !isHidden) {

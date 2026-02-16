@@ -1,5 +1,6 @@
 /*
     SPDX-FileCopyrightText: 2016 Kai Uwe Broulik <kde@privat.broulik.de>
+    SPDX-FileCopyrightText: 2026 Aaron Kirschen <aaronkirschen@gmail.com>
 
     SPDX-License-Identifier: GPL-2.0-or-later
 */

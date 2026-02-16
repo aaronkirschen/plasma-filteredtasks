@@ -1,3 +1,9 @@
+/*
+    SPDX-FileCopyrightText: 2026 Aaron Kirschen <aaronkirschen@gmail.com>
+
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
