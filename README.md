@@ -2,6 +2,8 @@
 
 A KDE Plasma 6 panel widget that extends the default Icons-Only Task Manager with **app grouping**, **colored sections**, and **spacers** — giving you full control over how your taskbar is organized.
 
+![Group configuration](screenshots/group-config.png)
+
 ## Features
 
 - **App Groups** — Create named groups and assign apps to them. Each group becomes a distinct section on your panel.
