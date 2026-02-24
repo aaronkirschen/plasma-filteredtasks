@@ -131,8 +131,85 @@ PlasmoidItem {
 
     onAllClaimedAppIdsChanged: _writeClaims()
 
+    // ── Layout profile sync ──
+    readonly property string _syncInstanceId: Math.random().toString(36).substring(2)
+    property bool _syncReceiving: false
+    property string _activeProfile: ""
+
+    readonly property string _profilesPath: _homeDir !== ""
+        ? (_homeDir + "/.config/plasma-filteredtasks-profiles.conf") : ""
+
+    LabSettings.Settings {
+        id: profileStore
+        fileName: tasks._profilesPath
+        category: "Profiles"
+    }
+
+    function _writeProfileToFile(name, data) {
+        if (!_profilesPath || !name) return;
+        profileStore.sync();
+        var names = String(profileStore.value("names", ""));
+        var arr = names ? names.split("|") : [];
+        if (arr.indexOf(name) < 0) {
+            arr.push(name);
+            profileStore.setValue("names", arr.join("|"));
+        }
+        profileStore.setValue("profile_" + name, data);
+        profileStore.sync();
+    }
+
+    function _removeProfileFromFile(name) {
+        if (!_profilesPath || !name) return;
+        profileStore.sync();
+        var names = String(profileStore.value("names", ""));
+        var arr = names ? names.split("|") : [];
+        arr = arr.filter(function(n) { return n !== name; });
+        profileStore.setValue("names", arr.join("|"));
+        profileStore.setValue("profile_" + name, "");
+        profileStore.sync();
+    }
+
+    function _registerProfile() {
+        var name = Plasmoid.configuration.syncGroup || "";
+        if (_activeProfile === name) return;
+        if (_activeProfile) TaskTools.unregisterProfile(_activeProfile, _syncInstanceId);
+        _activeProfile = name;
+        if (!name) return;
+        // Register in memory for live sync between running widgets
+        var existingData = TaskTools.registerProfile(name, _syncInstanceId, _onSyncReceived, Plasmoid.configuration.taskGroups);
+        // Also check the shared file for data from a previous session or config dialog
+        if (!existingData || existingData === "") {
+            profileStore.sync();
+            existingData = String(profileStore.value("profile_" + name, ""));
+        }
+        // If the profile already had data, adopt it
+        if (existingData && existingData !== "" && existingData !== Plasmoid.configuration.taskGroups) {
+            _syncReceiving = true;
+            Plasmoid.configuration.taskGroups = existingData;
+            _syncReceiving = false;
+        }
+        // Write current state to file so config dialogs can see it
+        _writeProfileToFile(name, Plasmoid.configuration.taskGroups);
+    }
+
+    function _onSyncReceived(data) {
+        _syncReceiving = true;
+        Plasmoid.configuration.taskGroups = data;
+        _syncReceiving = false;
+    }
+
+    Connections {
+        target: Plasmoid.configuration
+        function onSyncGroupChanged() { tasks._registerProfile(); }
+    }
+
     function _saveLayout(items) {
-        Plasmoid.configuration.taskGroups = JSON.stringify(items);
+        var json = JSON.stringify(items);
+        Plasmoid.configuration.taskGroups = json;
+        if (!_syncReceiving && _activeProfile) {
+            TaskTools.updateProfile(_activeProfile, json, _syncInstanceId);
+            _writeProfileToFile(_activeProfile, json);
+        }
     }
 
     function moveAppToGroup(appId, fromLayoutIdx, toLayoutIdx) {
@@ -798,6 +875,7 @@ PlasmoidItem {
 
     Component.onCompleted: {
         TaskTools.taskManagerInstanceCount += 1;
+        _registerProfile();
         requestLayout.connect(iconGeometryTimer.restart);
 
         // Initialize layout if no groups are configured yet
@@ -828,6 +906,7 @@ PlasmoidItem {
 
     Component.onDestruction: {
         TaskTools.taskManagerInstanceCount -= 1;
+        if (_activeProfile) TaskTools.unregisterProfile(_activeProfile, _syncInstanceId);
 
         // Clean up claims on destruction
         if (_claimsPath) {

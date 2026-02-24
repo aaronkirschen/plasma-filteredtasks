@@ -22,6 +22,7 @@ KCMUtils.SimpleKCM {
     property string cfg_taskGroups
     property string cfg_filterAppIds
     property bool cfg_exclusiveMode
+    property string cfg_syncGroup
 
     property var layoutItems: []
     property bool _loading: true
@@ -81,6 +82,7 @@ KCMUtils.SimpleKCM {
         _loading = false;
         rebuildLayoutModel();
         scanDebounce.start();
+        _refreshProfiles();
     }
 
     // ── Helpers ──
@@ -203,6 +205,63 @@ KCMUtils.SimpleKCM {
 
     property int pickerTargetGroup: -1
 
+    // ── Layout profile state ──
+    property var _knownProfiles: []
+    property bool _showProfileNameInput: false
+    property bool _renamingProfile: false
+
+    readonly property string _profilesPath: {
+        var url = Qt.resolvedUrl(".").toString();
+        var m = url.match(/^file:\/\/(\/[^\/]+\/[^\/]+)\//);
+        var home = m ? m[1] : "";
+        return home !== "" ? (home + "/.config/plasma-filteredtasks-profiles.conf") : "";
+    }
+
+    LabSettings.Settings {
+        id: profileStore
+        fileName: root._profilesPath
+        category: "Profiles"
+    }
+
+    function _refreshProfiles() {
+        if (!_profilesPath) { _knownProfiles = []; return; }
+        profileStore.sync();
+        var names = String(profileStore.value("names", ""));
+        if (!names) { _knownProfiles = []; return; }
+        _knownProfiles = names.split("|").filter(function(n) { return n !== ""; });
+    }
+
+    function _getProfileData(name) {
+        if (!_profilesPath || !name) return "";
+        profileStore.sync();
+        return String(profileStore.value("profile_" + name, ""));
+    }
+
+    function _removeProfile(name) {
+        if (!_profilesPath || !name) return;
+        profileStore.sync();
+        var names = String(profileStore.value("names", ""));
+        var arr = names ? names.split("|") : [];
+        arr = arr.filter(function(n) { return n !== name; });
+        profileStore.setValue("names", arr.join("|"));
+        profileStore.setValue("profile_" + name, "");
+        profileStore.sync();
+    }
+
+    function _renameProfile(oldName, newName) {
+        if (!_profilesPath || !oldName || !newName || oldName === newName) return;
+        profileStore.sync();
+        var data = String(profileStore.value("profile_" + oldName, ""));
+        var names = String(profileStore.value("names", ""));
+        var arr = names ? names.split("|") : [];
+        arr = arr.filter(function(n) { return n !== oldName; });
+        if (arr.indexOf(newName) < 0) arr.push(newName);
+        profileStore.setValue("names", arr.join("|"));
+        profileStore.setValue("profile_" + newName, data);
+        profileStore.setValue("profile_" + oldName, "");
+        profileStore.sync();
+    }
+
     // ── UI ──
     ColumnLayout {
         anchors.left: parent.left
@@ -218,6 +277,155 @@ KCMUtils.SimpleKCM {
         QQC2.Label {
             Layout.fillWidth: true
             text: i18n("When enabled, apps assigned to groups in this widget won't appear in other Filtered Task Manager widgets.")
+            wrapMode: Text.WordWrap
+            font: Kirigami.Theme.smallFont
+            opacity: 0.6
+        }
+
+        RowLayout {
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label {
+                text: i18n("Layout profile:")
+            }
+
+            QQC2.ComboBox {
+                id: profileCombo
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                textRole: "text"
+
+                model: {
+                    var items = [];
+                    // Current profile first (if set)
+                    if (cfg_syncGroup) {
+                        items.push({text: cfg_syncGroup, value: cfg_syncGroup});
+                    }
+                    // Other known profiles
+                    var known = root._knownProfiles;
+                    for (var i = 0; i < known.length; i++) {
+                        if (known[i] !== cfg_syncGroup) {
+                            items.push({text: known[i], value: known[i]});
+                        }
+                    }
+                    items.push({text: i18n("Create new..."), value: "__create__"});
+                    items.push({text: i18n("None (no sync)"), value: "__none__"});
+                    return items;
+                }
+
+                currentIndex: cfg_syncGroup ? 0 : (model.length - 1)
+
+                onActivated: function(index) {
+                    var entry = model[index];
+                    if (entry.value === "__none__") {
+                        cfg_syncGroup = "";
+                        root._showProfileNameInput = false;
+                    } else if (entry.value === "__create__") {
+                        root._showProfileNameInput = true;
+                        root._renamingProfile = false;
+                        profileNameField.text = "";
+                        profileNameField.forceActiveFocus();
+                    } else {
+                        cfg_syncGroup = entry.value;
+                        root._showProfileNameInput = false;
+                        // Load the profile's layout into the config UI
+                        var profileData = root._getProfileData(entry.value);
+                        if (profileData && profileData !== "") {
+                            root._loading = true;
+                            try {
+                                var parsed = JSON.parse(profileData);
+                                if (parsed.length > 0) {
+                                    root.layoutItems = parsed;
+                                    cfg_taskGroups = profileData;
+                                }
+                            } catch(e) {}
+                            root._loading = false;
+                            root.rebuildLayoutModel();
+                        }
+                    }
+                }
+            }
+
+            QQC2.ToolButton {
+                icon.name: "edit-rename"
+                visible: cfg_syncGroup !== ""
+                QQC2.ToolTip.text: i18n("Rename profile")
+                QQC2.ToolTip.visible: hovered
+                onClicked: {
+                    root._showProfileNameInput = true;
+                    root._renamingProfile = true;
+                    profileNameField.text = cfg_syncGroup;
+                    profileNameField.selectAll();
+                    profileNameField.forceActiveFocus();
+                }
+            }
+
+            QQC2.ToolButton {
+                icon.name: "edit-delete"
+                visible: cfg_syncGroup !== ""
+                QQC2.ToolTip.text: i18n("Remove profile (keeps current layout)")
+                QQC2.ToolTip.visible: hovered
+                onClicked: {
+                    root._removeProfile(cfg_syncGroup);
+                    cfg_syncGroup = "";
+                    root._showProfileNameInput = false;
+                    root._refreshProfiles();
+                }
+            }
+        }
+
+        RowLayout {
+            visible: root._showProfileNameInput
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.TextField {
+                id: profileNameField
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                placeholderText: i18n("Profile name...")
+
+                function commit() {
+                    var name = text.trim();
+                    if (name === "") return;
+                    if (root._renamingProfile && cfg_syncGroup) {
+                        root._renameProfile(cfg_syncGroup, name);
+                    }
+                    cfg_syncGroup = name;
+                    root._showProfileNameInput = false;
+                    root._renamingProfile = false;
+                    root._refreshProfiles();
+                }
+
+                onAccepted: commit()
+                Keys.onEscapePressed: {
+                    root._showProfileNameInput = false;
+                    root._renamingProfile = false;
+                }
+            }
+            QQC2.Button {
+                icon.name: "dialog-ok"
+                onClicked: profileNameField.commit()
+            }
+            QQC2.Button {
+                icon.name: "dialog-cancel"
+                onClicked: {
+                    root._showProfileNameInput = false;
+                    root._renamingProfile = false;
+                }
+            }
+        }
+
+        QQC2.Label {
+            Layout.fillWidth: true
+            text: {
+                if (cfg_syncGroup) {
+                    var found = root._knownProfiles.indexOf(cfg_syncGroup) >= 0;
+                    if (found) {
+                        return i18n("Synced with profile \"%1\". Changes on any widget using this profile are shared instantly.", cfg_syncGroup);
+                    } else {
+                        return i18n("Profile \"%1\" will be created when you apply. Other widgets can then join it.", cfg_syncGroup);
+                    }
+                }
+                return i18n("No profile. Select an existing profile from the dropdown to sync, or create a new one.");
+            }
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.6

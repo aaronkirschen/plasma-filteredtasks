@@ -767,9 +767,9 @@ PlasmaExtras.Menu {
                     var displayName = (name === "__ungrouped") ? i18n("Ungrouped") : name;
                     var menuItem = menu.newMenuItem(moveToGroupMenu);
                     menuItem.text = displayName;
-                    menuItem.clicked.connect((function(aid, from, to) {
-                        return function() { tasks.moveAppToGroup(aid, from, to); };
-                    })(appId, currentIdx, i));
+                    menuItem.clicked.connect((function(aid, from, to, root) {
+                        return function() { root.moveAppToGroup(aid, from, to); };
+                    })(appId, currentIdx, i, tasks));
                 }
 
                 menu.newSeparator(moveToGroupMenu);
@@ -777,10 +777,10 @@ PlasmaExtras.Menu {
                 var newGroupItem = menu.newMenuItem(moveToGroupMenu);
                 newGroupItem.text = i18n("New Group...");
                 newGroupItem.icon = "list-add";
-                newGroupItem.clicked.connect((function(aid, from, vp) {
+                newGroupItem.clicked.connect((function(aid, from, vp, root) {
                     return function() {
-                        if (tasks.inputDialogComponent.status !== Component.Ready) return;
-                        var dlg = tasks.inputDialogComponent.createObject(tasks, {
+                        if (root.inputDialogComponent.status !== Component.Ready) return;
+                        var dlg = root.inputDialogComponent.createObject(root, {
                             visualParent: vp,
                             visible: true,
                             title: i18n("Group Name"),
@@ -788,10 +788,10 @@ PlasmaExtras.Menu {
                             placeholderText: i18n("Enter group name...")
                         });
                         dlg.accepted.connect(function(text) {
-                            tasks.addAppToNewGroup(aid, from, text);
+                            root.addAppToNewGroup(aid, from, text);
                         });
                     };
-                })(appId, currentIdx, menu.visualParent));
+                })(appId, currentIdx, menu.visualParent, tasks));
             }
 
             Component.onCompleted: refresh()

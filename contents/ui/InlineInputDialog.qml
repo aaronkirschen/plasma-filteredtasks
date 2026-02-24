@@ -22,7 +22,7 @@ PlasmaCore.PopupPlasmaWindow {
     signal cancelled()
 
     width: Kirigami.Units.gridUnit * 16
-    height: contentLayout.implicitHeight + topPadding + bottomPadding
+    height: Kirigami.Units.gridUnit * 5
 
     animated: true
     removeBorderStrategy: Plasmoid.location === PlasmaCore.Types.Floating

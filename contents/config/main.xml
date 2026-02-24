@@ -180,6 +180,10 @@
       <label>When enabled, apps assigned to any group in this widget are hidden from other Filtered Task Manager instances.</label>
       <default>true</default>
     </entry>
+    <entry name="syncGroup" type="String">
+      <label>Sync group name. Widgets with the same sync group keep their layout in sync. Empty means no sync.</label>
+      <default></default>
+    </entry>
   </group>
 
 </kcfg>

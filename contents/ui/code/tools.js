@@ -14,6 +14,95 @@
 // Can't be `let`, or else QML counterpart won't be able to assign to it.
 var taskManagerInstanceCount = 0;
 
+// ── Layout profile registry ──
+// Shared across all plasmoid instances in the same plasmashell process.
+// Key = profile name, Value = {data: jsonString, instances: [{id, callback}]}
+var _profileRegistry = {};
+var _profileChangeListeners = [];
+
+function getProfileNames() {
+    return Object.keys(_profileRegistry);
+}
+
+function getProfileData(profileName) {
+    if (!profileName || !_profileRegistry[profileName]) return null;
+    return _profileRegistry[profileName].data;
+}
+
+// Register an instance to a profile. Returns the current profile data (or null if new).
+function registerProfile(profileName, instanceId, callback, initialData) {
+    if (!profileName) return null;
+    if (!_profileRegistry[profileName]) {
+        _profileRegistry[profileName] = {data: initialData || "", instances: []};
+    }
+    var profile = _profileRegistry[profileName];
+    // Avoid duplicate registration
+    for (var i = 0; i < profile.instances.length; i++) {
+        if (profile.instances[i].id === instanceId) return profile.data;
+    }
+    profile.instances.push({id: instanceId, callback: callback});
+    _notifyProfileChange();
+    return profile.data;
+}
+
+function unregisterProfile(profileName, instanceId) {
+    if (!profileName || !_profileRegistry[profileName]) return;
+    var profile = _profileRegistry[profileName];
+    profile.instances = profile.instances.filter(function(e) {
+        return e.id !== instanceId;
+    });
+    if (profile.instances.length === 0) delete _profileRegistry[profileName];
+    _notifyProfileChange();
+}
+
+// Update profile data and broadcast to all other instances on this profile.
+function updateProfile(profileName, data, senderId) {
+    if (!profileName || !_profileRegistry[profileName]) return;
+    _profileRegistry[profileName].data = data;
+    var instances = _profileRegistry[profileName].instances;
+    for (var i = 0; i < instances.length; i++) {
+        if (instances[i].id !== senderId) {
+            instances[i].callback(data);
+        }
+    }
+}
+
+function deleteProfile(profileName) {
+    if (!profileName || !_profileRegistry[profileName]) return;
+    delete _profileRegistry[profileName];
+    _notifyProfileChange();
+}
+
+function renameProfile(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return;
+    if (!_profileRegistry[oldName]) return;
+    _profileRegistry[newName] = _profileRegistry[oldName];
+    delete _profileRegistry[oldName];
+    // Notify all instances on this profile about the name change
+    var instances = _profileRegistry[newName].instances;
+    for (var i = 0; i < instances.length; i++) {
+        if (instances[i].onRenamed) instances[i].onRenamed(newName);
+    }
+    _notifyProfileChange();
+}
+
+// Profile list change listeners (for config UI dropdowns)
+function addProfileChangeListener(callback) {
+    _profileChangeListeners.push(callback);
+}
+
+function removeProfileChangeListener(callback) {
+    _profileChangeListeners = _profileChangeListeners.filter(function(cb) {
+        return cb !== callback;
+    });
+}
+
+function _notifyProfileChange() {
+    for (var i = 0; i < _profileChangeListeners.length; i++) {
+        _profileChangeListeners[i]();
+    }
+}
+
 function activateNextPrevTask(anchor, next, wheelSkipMinimized, wheelEnabled, tasks) {
     // FIXME TODO: Unnecessarily convoluted and costly; optimize.
 
