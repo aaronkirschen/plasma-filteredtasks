@@ -48,8 +48,8 @@ PlasmaExtras.Menu {
                 visualParent: spacerMenu.visualParent,
                 visible: true,
                 title: i18n("Spacer Width (px)"),
-                value: String(spacerMenu.itemData.width || 8),
-                placeholderText: i18n("Width in pixels...")
+                value: spacerMenu.itemData.widthSpec || String(spacerMenu.itemData.width || 8),
+                placeholderText: i18n("e.g. 20 or 5vw")
             });
             dlg.accepted.connect(function(text) {
                 root.updateSpacerWidth(idx, text);

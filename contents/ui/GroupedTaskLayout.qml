@@ -174,7 +174,7 @@ Item {
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
                 property Item taskFlow: isGroup ? flowH : null
-
+                readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentWidth: {
                     if (!isGroup) return 0;
@@ -186,8 +186,8 @@ Item {
                     return w;
                 }
                 Layout.fillHeight: true
-                Layout.preferredWidth: isSpacer ? (itemData.width || 0) : contentWidth
-                Layout.maximumWidth: isSpacer ? (itemData.width || 0) : contentWidth
+                Layout.preferredWidth: isSpacer ? spacerSize : contentWidth
+                Layout.maximumWidth: isSpacer ? spacerSize : contentWidth
 
                 Rectangle {
                     visible: sectionH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource)
@@ -240,7 +240,7 @@ Item {
                     }
                 }
 
-                implicitWidth: isSpacer ? (itemData.width || 0) : contentWidth
+                implicitWidth: isSpacer ? spacerSize : contentWidth
             }
         }
 
@@ -271,7 +271,7 @@ Item {
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
                 property Item taskFlow: isGroup ? flowV : null
-
+                readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentHeight: {
                     if (!isGroup) return 0;
@@ -283,8 +283,8 @@ Item {
                     return h;
                 }
                 Layout.fillWidth: true
-                Layout.preferredHeight: isSpacer ? (itemData.width || 0) : contentHeight
-                Layout.maximumHeight: isSpacer ? (itemData.width || 0) : contentHeight
+                Layout.preferredHeight: isSpacer ? spacerSize : contentHeight
+                Layout.maximumHeight: isSpacer ? spacerSize : contentHeight
 
                 Rectangle {
                     visible: sectionV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource)
@@ -336,7 +336,7 @@ Item {
                     }
                 }
 
-                implicitHeight: isSpacer ? (itemData.width || 0) : contentHeight
+                implicitHeight: isSpacer ? spacerSize : contentHeight
             }
         }
 

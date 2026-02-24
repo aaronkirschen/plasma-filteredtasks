@@ -186,14 +186,27 @@ PlasmoidItem {
     }
 
     function updateSpacerWidth(layoutIndex, newWidth) {
-        var w = Number(newWidth);
-        if (isNaN(w) || w < 1) w = 8;
-        w = Math.round(w);
+        var spec = String(newWidth).trim();
+        if (!spec) spec = "8";
         var items = parsedLayout.slice();
         if (layoutIndex >= 0 && layoutIndex < items.length && items[layoutIndex].type === "spacer") {
-            items[layoutIndex] = {type: "spacer", width: w};
+            // Store raw spec string for vw support; also store numeric width for backwards compat
+            var px = resolveSpacerWidth(spec);
+            items[layoutIndex] = {type: "spacer", width: px, widthSpec: spec};
             _saveLayout(items);
         }
+    }
+
+    function resolveSpacerWidth(spec) {
+        var s = String(spec).trim().toLowerCase();
+        var vwMatch = s.match(/^([0-9]*\.?[0-9]+)\s*vw$/);
+        if (vwMatch) {
+            var vw = parseFloat(vwMatch[1]);
+            var screenW = Plasmoid.containment.screenGeometry.width || Screen.width || 1920;
+            return Math.max(1, Math.round(screenW * vw / 100));
+        }
+        var px = Number(s);
+        return (isNaN(px) || px < 1) ? 8 : Math.round(px);
     }
 
     function renameGroup(layoutIndex, newName) {
