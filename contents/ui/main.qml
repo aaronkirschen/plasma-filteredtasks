@@ -152,6 +152,70 @@ PlasmoidItem {
         _saveLayout(items);
     }
 
+    function addAppToNewGroup(appId, fromLayoutIdx, groupName) {
+        var name = (groupName && groupName.trim() !== "") ? groupName.trim() : "New Group";
+        var items = parsedLayout.slice();
+        // Remove from old group
+        if (fromLayoutIdx >= 0 && fromLayoutIdx < items.length && items[fromLayoutIdx].type === "group") {
+            items[fromLayoutIdx] = Object.assign({}, items[fromLayoutIdx]);
+            items[fromLayoutIdx].appIds = (items[fromLayoutIdx].appIds || []).filter(function(id) { return id !== appId; });
+        }
+        // Find ungrouped index to insert before it
+        var insertIdx = items.length;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].type === "group" && items[i].name === "__ungrouped") {
+                insertIdx = i;
+                break;
+            }
+        }
+        items.splice(insertIdx, 0, {type: "group", name: name, appIds: [appId], color: ""});
+        _saveLayout(items);
+    }
+
+    function addGroupAt(layoutIndex, groupName) {
+        var name = (groupName && groupName.trim() !== "") ? groupName.trim() : "New Group";
+        var items = parsedLayout.slice();
+        items.splice(layoutIndex, 0, {type: "group", name: name, appIds: [], color: ""});
+        _saveLayout(items);
+    }
+
+    function addSpacerAt(layoutIndex) {
+        var items = parsedLayout.slice();
+        items.splice(layoutIndex, 0, {type: "spacer", width: 8});
+        _saveLayout(items);
+    }
+
+    function updateSpacerWidth(layoutIndex, newWidth) {
+        var w = Number(newWidth);
+        if (isNaN(w) || w < 1) w = 8;
+        w = Math.round(w);
+        var items = parsedLayout.slice();
+        if (layoutIndex >= 0 && layoutIndex < items.length && items[layoutIndex].type === "spacer") {
+            items[layoutIndex] = {type: "spacer", width: w};
+            _saveLayout(items);
+        }
+    }
+
+    function renameGroup(layoutIndex, newName) {
+        var items = parsedLayout.slice();
+        if (layoutIndex >= 0 && layoutIndex < items.length && items[layoutIndex].type === "group") {
+            items[layoutIndex] = Object.assign({}, items[layoutIndex]);
+            items[layoutIndex].name = (newName && newName.trim() !== "") ? newName.trim() : items[layoutIndex].name;
+            _saveLayout(items);
+        }
+    }
+
+    function removeLayoutItem(layoutIndex) {
+        var items = parsedLayout.slice();
+        if (layoutIndex >= 0 && layoutIndex < items.length) {
+            // If removing a group, its apps become ungrouped (just remove the group entry)
+            items.splice(layoutIndex, 1);
+        }
+        _saveLayout(items);
+    }
+
+    readonly property Component inputDialogComponent: Qt.createComponent("InlineInputDialog.qml")
+
     readonly property Component contextMenuComponent: Qt.createComponent("ContextMenu.qml")
     readonly property Component pulseAudioComponent: Qt.createComponent("PulseAudio.qml")
 

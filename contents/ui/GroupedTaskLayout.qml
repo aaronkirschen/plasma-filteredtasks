@@ -175,6 +175,7 @@ Item {
                 readonly property string itemColor: itemData.color || ""
                 property Item taskFlow: isGroup ? flowH : null
 
+
                 readonly property real contentWidth: {
                     if (!isGroup) return 0;
                     var w = 0;
@@ -219,6 +220,26 @@ Item {
                     property int animationsRunning: 0
                 }
 
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionH.isGroup
+                    onTapped: function(eventPoint) {
+                        var localPos = flowH.mapFromItem(sectionH, eventPoint.position.x, eventPoint.position.y);
+                        var child = flowH.childAt(localPos.x, localPos.y);
+                        if (!child) {
+                            groupedLayout.showSectionMenu(sectionH, sectionH.index);
+                        }
+                    }
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionH.isSpacer
+                    onTapped: {
+                        groupedLayout.showSpacerMenu(sectionH, sectionH.index);
+                    }
+                }
+
                 implicitWidth: isSpacer ? (itemData.width || 0) : contentWidth
             }
         }
@@ -250,6 +271,7 @@ Item {
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
                 property Item taskFlow: isGroup ? flowV : null
+
 
                 readonly property real contentHeight: {
                     if (!isGroup) return 0;
@@ -294,6 +316,26 @@ Item {
                     property int animationsRunning: 0
                 }
 
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionV.isGroup
+                    onTapped: function(eventPoint) {
+                        var localPos = flowV.mapFromItem(sectionV, eventPoint.position.x, eventPoint.position.y);
+                        var child = flowV.childAt(localPos.x, localPos.y);
+                        if (!child) {
+                            groupedLayout.showSectionMenu(sectionV, sectionV.index);
+                        }
+                    }
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionV.isSpacer
+                    onTapped: {
+                        groupedLayout.showSpacerMenu(sectionV, sectionV.index);
+                    }
+                }
+
                 implicitHeight: isSpacer ? (itemData.width || 0) : contentHeight
             }
         }
@@ -308,5 +350,28 @@ Item {
         var section = rep.itemAt(layoutIndex);
         if (!section || !section.isGroup) return null;
         return section.taskFlow;
+    }
+
+    readonly property Component sectionMenuComponent: Qt.createComponent("GroupSectionMenu.qml")
+    readonly property Component spacerMenuComponent: Qt.createComponent("SpacerMenu.qml")
+
+    function showSectionMenu(section, layoutIndex) {
+        if (sectionMenuComponent.status !== Component.Ready) return;
+        var menu = sectionMenuComponent.createObject(section, {
+            layoutIndex: layoutIndex,
+            tasksRoot: tasks,
+            visualParent: section
+        });
+        menu.openRelative();
+    }
+
+    function showSpacerMenu(section, layoutIndex) {
+        if (spacerMenuComponent.status !== Component.Ready) return;
+        var menu = spacerMenuComponent.createObject(section, {
+            layoutIndex: layoutIndex,
+            tasksRoot: tasks,
+            visualParent: section
+        });
+        menu.openRelative();
     }
 }

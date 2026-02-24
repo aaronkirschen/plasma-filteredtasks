@@ -46,8 +46,11 @@ PlasmaExtras.Menu {
     onStatusChanged: {
         if (visualParent && get(atm.LauncherUrlWithoutIcon).toString() !== "" && status === PlasmaExtras.Menu.Open) {
             activitiesDesktopsMenu.refresh();
-
-        } else if (status === PlasmaExtras.Menu.Closed) {
+        }
+        if (visualParent && status === PlasmaExtras.Menu.Open && tasks.groupedMode) {
+            moveToGroupMenu.refresh();
+        }
+        if (status === PlasmaExtras.Menu.Closed) {
             menu.destroy();
         }
     }
@@ -730,6 +733,126 @@ PlasmaExtras.Menu {
                 icon: "view-group"
 
                 onClicked: tasksModel.requestToggleGrouping(menu.modelIndex)
+            }
+        }
+    }
+
+    PlasmaExtras.MenuItem {
+        id: moveToGroupMenuItem
+
+        visible: tasks.groupedMode && visualParent && !get(atm.IsLauncher) && !get(atm.IsStartup)
+        enabled: visible
+
+        text: i18n("Move to &Group")
+        icon: "folder-move"
+
+        readonly property PlasmaExtras.Menu _moveToGroupMenu: PlasmaExtras.Menu {
+            id: moveToGroupMenu
+
+            visualParent: moveToGroupMenuItem.action
+
+            function refresh() {
+                clearMenuItems();
+
+                if (!menu.visualParent || !tasks.groupedMode) return;
+
+                var appId = menu.visualParent.appId;
+                var currentIdx = menu.visualParent.groupIndex;
+                var layout = tasks.parsedLayout;
+
+                for (var i = 0; i < layout.length; i++) {
+                    if (layout[i].type !== "group") continue;
+                    if (i === currentIdx) continue;
+                    var name = layout[i].name;
+                    var displayName = (name === "__ungrouped") ? i18n("Ungrouped") : name;
+                    var menuItem = menu.newMenuItem(moveToGroupMenu);
+                    menuItem.text = displayName;
+                    menuItem.clicked.connect((function(aid, from, to) {
+                        return function() { tasks.moveAppToGroup(aid, from, to); };
+                    })(appId, currentIdx, i));
+                }
+
+                menu.newSeparator(moveToGroupMenu);
+
+                var newGroupItem = menu.newMenuItem(moveToGroupMenu);
+                newGroupItem.text = i18n("New Group...");
+                newGroupItem.icon = "list-add";
+                newGroupItem.clicked.connect((function(aid, from, vp) {
+                    return function() {
+                        if (tasks.inputDialogComponent.status !== Component.Ready) return;
+                        var dlg = tasks.inputDialogComponent.createObject(tasks, {
+                            visualParent: vp,
+                            visible: true,
+                            title: i18n("Group Name"),
+                            value: "New Group",
+                            placeholderText: i18n("Enter group name...")
+                        });
+                        dlg.accepted.connect(function(text) {
+                            tasks.addAppToNewGroup(aid, from, text);
+                        });
+                    };
+                })(appId, currentIdx, menu.visualParent));
+            }
+
+            Component.onCompleted: refresh()
+        }
+    }
+
+    PlasmaExtras.MenuItem {
+        id: removeFromGroupItem
+
+        visible: {
+            if (!tasks.groupedMode || !visualParent || get(atm.IsLauncher) || get(atm.IsStartup)) return false;
+            var gIdx = visualParent.groupIndex;
+            if (gIdx < 0) return false;
+            var layout = tasks.parsedLayout;
+            if (gIdx >= layout.length) return false;
+            return layout[gIdx].type === "group" && layout[gIdx].name !== "__ungrouped";
+        }
+
+        text: i18n("Remove from Group")
+        icon: "list-remove"
+
+        onClicked: {
+            var appId = visualParent.appId;
+            var fromIdx = visualParent.groupIndex;
+            // Find ungrouped index
+            var layout = tasks.parsedLayout;
+            var ungroupedIdx = -1;
+            for (var i = 0; i < layout.length; i++) {
+                if (layout[i].type === "group" && layout[i].name === "__ungrouped") {
+                    ungroupedIdx = i;
+                    break;
+                }
+            }
+            if (ungroupedIdx >= 0) {
+                tasks.moveAppToGroup(appId, fromIdx, ungroupedIdx);
+            }
+        }
+    }
+
+    PlasmaExtras.MenuItem {
+        id: addSpacerBeforeGroupItem
+
+        visible: tasks.groupedMode && visualParent && !get(atm.IsLauncher) && !get(atm.IsStartup)
+            && visualParent && visualParent.groupIndex >= 0
+
+        text: {
+            if (!visible || !visualParent) return "";
+            var gIdx = visualParent.groupIndex;
+            var layout = tasks.parsedLayout;
+            if (gIdx >= 0 && gIdx < layout.length && layout[gIdx].type === "group") {
+                var name = layout[gIdx].name;
+                var displayName = (name === "__ungrouped") ? i18n("Ungrouped") : name;
+                return i18n("Add Spacer Before \"%1\"", displayName);
+            }
+            return i18n("Add Spacer Before Group");
+        }
+        icon: "distribute-horizontal"
+
+        onClicked: {
+            if (visualParent && visualParent.groupIndex >= 0) {
+                tasks.addSpacerAt(visualParent.groupIndex);
             }
         }
     }
