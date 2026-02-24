@@ -49,6 +49,15 @@ DropArea {
         }
 
         if (!above) {
+            if (tasks.groupedMode && tasks.dragSource) {
+                var mappedPos = tasks.groupedLayout.mapFromItem(dropArea, event.x, event.y);
+                var targetIdx = tasks.groupedLayout.groupIndexAtPosition(mappedPos.x, mappedPos.y);
+                tasks.groupedLayout.dropTargetGroupIndex = targetIdx;
+                if (targetIdx >= 0 && tasks.dragSource.groupIndex >= 0
+                    && tasks.dragSource.groupIndex !== targetIdx) {
+                    tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, targetIdx);
+                }
+            }
             hoveredItem = null;
             activationTimer.stop();
 
@@ -74,9 +83,17 @@ DropArea {
             ignoredItem = null;
         }
 
+        if (tasks.groupedMode && tasks.dragSource && above.groupIndex >= 0) {
+            tasks.groupedLayout.dropTargetGroupIndex = above.groupIndex;
+        }
+
         if (tasksModel.sortMode === TaskManager.TasksModel.SortManual && tasks.dragSource) {
-            // Reject drags between different TaskList instances.
+            // Handle drags between different groups in grouped mode.
             if (tasks.dragSource.parent !== above.parent) {
+                if (tasks.groupedMode && tasks.dragSource.groupIndex >= 0
+                    && above.groupIndex >= 0 && tasks.dragSource.groupIndex !== above.groupIndex) {
+                    tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, above.groupIndex);
+                }
                 return;
             }
 
@@ -112,9 +129,15 @@ DropArea {
     onExited: {
         hoveredItem = null;
         activationTimer.stop();
+        if (tasks.groupedMode) {
+            tasks.groupedLayout.dropTargetGroupIndex = -1;
+        }
     }
 
     onDropped: event => {
+        if (tasks.groupedMode) {
+            tasks.groupedLayout.dropTargetGroupIndex = -1;
+        }
         // Reject internal drops.
         if (event.formats.indexOf("application/x-orgkdeplasmataskmanager_taskbuttonitem") >= 0) {
             event.accepted = false;

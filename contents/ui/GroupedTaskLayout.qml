@@ -8,6 +8,7 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
+import org.kde.kirigami as Kirigami
 
 Item {
     id: groupedLayout
@@ -16,6 +17,7 @@ Item {
     property bool animating: false
     // 0 = Left, 1 = Right, 2 = Center, 3 = No Fill (no fillers active)
     property int alignment: 0
+    property int dropTargetGroupIndex: -1
 
     implicitWidth: tasks.vertical ? groupColumn.implicitWidth : groupRow.implicitWidth
     implicitHeight: tasks.vertical ? groupColumn.implicitHeight : groupRow.implicitHeight
@@ -105,7 +107,9 @@ Item {
     }
 
     onLayoutItemsChanged: {
-        _returnAllTasksToTaskList();
+        if (!tasks.dragSource) {
+            _returnAllTasksToTaskList();
+        }
         _reparentTimer.restart();
     }
 
@@ -131,6 +135,20 @@ Item {
             if (child) return child;
         }
         return null;
+    }
+
+    function groupIndexAtPosition(x, y) {
+        var rep = tasks.vertical ? repeaterV : repeaterH;
+        for (var g = 0; g < rep.count; g++) {
+            var section = rep.itemAt(g);
+            if (!section || !section.isGroup) continue;
+            var localPos = section.mapFromItem(groupedLayout, x, y);
+            if (localPos.x >= 0 && localPos.x <= section.width
+                && localPos.y >= 0 && localPos.y <= section.height) {
+                return section.index;
+            }
+        }
+        return -1;
     }
 
     // ── Horizontal panel ──
@@ -171,9 +189,12 @@ Item {
                 Layout.maximumWidth: isSpacer ? (itemData.width || 0) : contentWidth
 
                 Rectangle {
-                    visible: sectionH.itemColor !== ""
+                    visible: sectionH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource)
                     anchors.fill: parent
-                    color: sectionH.itemColor
+                    color: sectionH.itemColor || "transparent"
+                    border.color: (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource)
+                        ? Kirigami.Theme.highlightColor : "transparent"
+                    border.width: (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
@@ -244,9 +265,12 @@ Item {
                 Layout.maximumHeight: isSpacer ? (itemData.width || 0) : contentHeight
 
                 Rectangle {
-                    visible: sectionV.itemColor !== ""
+                    visible: sectionV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource)
                     anchors.fill: parent
-                    color: sectionV.itemColor
+                    color: sectionV.itemColor || "transparent"
+                    border.color: (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource)
+                        ? Kirigami.Theme.highlightColor : "transparent"
+                    border.width: (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
