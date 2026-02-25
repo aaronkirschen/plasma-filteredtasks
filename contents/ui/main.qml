@@ -42,9 +42,13 @@ PlasmoidItem {
     property Task toolTipOpenedByClick
     property Task toolTipAreaItem
 
+    // Live layout JSON — the single source of truth for this instance.
+    // Set from the shared sync group in tools.js, or from local config if not syncing.
+    property string _liveLayoutJson: ""
+
     // Parsed layout: mixed array of group and spacer items from config
     readonly property var parsedLayout: {
-        var raw = Plasmoid.configuration.taskGroups;
+        var raw = _liveLayoutJson;
         if (!raw || raw.trim() === "") return [];
         try { return JSON.parse(raw); }
         catch (e) { return []; }
@@ -131,84 +135,111 @@ PlasmoidItem {
 
     onAllClaimedAppIdsChanged: _writeClaims()
 
-    // ── Layout profile sync ──
-    readonly property string _syncInstanceId: Math.random().toString(36).substring(2)
-    property bool _syncReceiving: false
-    property string _activeProfile: ""
-
-    readonly property string _profilesPath: _homeDir !== ""
-        ? (_homeDir + "/.config/plasma-filteredtasks-profiles.conf") : ""
+    // ── Sync group name registry (file-based, for cross-process discovery) ──
+    readonly property string _syncNamesPath: _homeDir !== ""
+        ? (_homeDir + "/.config/plasma-filteredtasks-syncgroups.conf") : ""
 
     LabSettings.Settings {
-        id: profileStore
-        fileName: tasks._profilesPath
-        category: "Profiles"
+        id: syncNamesStore
+        fileName: tasks._syncNamesPath
+        category: "SyncGroups"
     }
 
-    function _writeProfileToFile(name, data) {
-        if (!_profilesPath || !name) return;
-        profileStore.sync();
-        var names = String(profileStore.value("names", ""));
-        var arr = names ? names.split("|") : [];
+    function _registerSyncGroupName(name) {
+        if (!_syncNamesPath || !name) return;
+        syncNamesStore.sync();
+        var names = String(syncNamesStore.value("names", ""));
+        var arr = names ? names.split("|").filter(function(n) { return n !== ""; }) : [];
         if (arr.indexOf(name) < 0) {
             arr.push(name);
-            profileStore.setValue("names", arr.join("|"));
+            syncNamesStore.setValue("names", arr.join("|"));
         }
-        profileStore.setValue("profile_" + name, data);
-        profileStore.sync();
+        // Also persist current layout so config dialogs (separate process) can read it
+        syncNamesStore.setValue("layout_" + name, Plasmoid.configuration.taskGroups);
+        syncNamesStore.sync();
     }
 
-    function _removeProfileFromFile(name) {
-        if (!_profilesPath || !name) return;
-        profileStore.sync();
-        var names = String(profileStore.value("names", ""));
-        var arr = names ? names.split("|") : [];
+    function _persistSyncGroupLayout(name, json) {
+        if (!_syncNamesPath || !name) return;
+        syncNamesStore.setValue("layout_" + name, json);
+        syncNamesStore.sync();
+    }
+
+    function _unregisterSyncGroupName(name) {
+        if (!_syncNamesPath || !name) return;
+        // Only remove if no other live subscribers remain
+        var liveNames = TaskTools.getSyncGroupNames();
+        if (liveNames.indexOf(name) >= 0) return;
+        syncNamesStore.sync();
+        var names = String(syncNamesStore.value("names", ""));
+        var arr = names ? names.split("|").filter(function(n) { return n !== ""; }) : [];
         arr = arr.filter(function(n) { return n !== name; });
-        profileStore.setValue("names", arr.join("|"));
-        profileStore.setValue("profile_" + name, "");
-        profileStore.sync();
+        syncNamesStore.setValue("names", arr.join("|"));
+        syncNamesStore.sync();
     }
 
-    function _registerProfile() {
+    // ── Layout sync via shared tools.js state ──
+    readonly property string _syncInstanceId: Math.random().toString(36).substring(2)
+    property string _activeSyncGroup: ""
+
+    function _joinSyncGroup() {
         var name = Plasmoid.configuration.syncGroup || "";
-        if (_activeProfile === name) return;
-        if (_activeProfile) TaskTools.unregisterProfile(_activeProfile, _syncInstanceId);
-        _activeProfile = name;
-        if (!name) return;
-        // Register in memory for live sync between running widgets
-        var existingData = TaskTools.registerProfile(name, _syncInstanceId, _onSyncReceived, Plasmoid.configuration.taskGroups);
-        // Also check the shared file for data from a previous session or config dialog
-        if (!existingData || existingData === "") {
-            profileStore.sync();
-            existingData = String(profileStore.value("profile_" + name, ""));
+        if (_activeSyncGroup === name) return;
+        var oldGroup = _activeSyncGroup;
+        // Leave previous group
+        if (_activeSyncGroup) TaskTools.leaveSyncGroup(_activeSyncGroup, _syncInstanceId);
+        _activeSyncGroup = name;
+        // Clean up old group name from file if nobody else is using it
+        if (oldGroup) _unregisterSyncGroupName(oldGroup);
+        if (!name) {
+            // No sync group — use local config directly
+            _liveLayoutJson = Plasmoid.configuration.taskGroups;
+            return;
         }
-        // If the profile already had data, adopt it
-        if (existingData && existingData !== "" && existingData !== Plasmoid.configuration.taskGroups) {
-            _syncReceiving = true;
-            Plasmoid.configuration.taskGroups = existingData;
-            _syncReceiving = false;
+        // Join the group; returns existing layout if another widget is already in it
+        var existing = TaskTools.joinSyncGroup(name, _syncInstanceId, _onSyncLayoutChanged, Plasmoid.configuration.taskGroups);
+        if (existing && existing !== "") {
+            // Adopt the group's current state
+            _liveLayoutJson = existing;
+            Plasmoid.configuration.taskGroups = existing;
+        } else {
+            // We're the first widget — seed from our local config
+            _liveLayoutJson = Plasmoid.configuration.taskGroups;
         }
-        // Write current state to file so config dialogs can see it
-        _writeProfileToFile(name, Plasmoid.configuration.taskGroups);
+        // Register name to file so config dialogs can discover it
+        _registerSyncGroupName(name);
     }
 
-    function _onSyncReceived(data) {
-        _syncReceiving = true;
-        Plasmoid.configuration.taskGroups = data;
-        _syncReceiving = false;
+    function _onSyncLayoutChanged(newJson) {
+        _liveLayoutJson = newJson;
+        Plasmoid.configuration.taskGroups = newJson;
     }
 
     Connections {
         target: Plasmoid.configuration
-        function onSyncGroupChanged() { tasks._registerProfile(); }
+        function onSyncGroupChanged() { tasks._joinSyncGroup(); }
+        function onTaskGroupsChanged() {
+            // Pick up external config changes (e.g. from config dialog Apply).
+            // If _saveLayout or _onSyncLayoutChanged already set _liveLayoutJson
+            // to this value, this is a no-op due to string comparison.
+            var cfg = Plasmoid.configuration.taskGroups;
+            if (cfg !== tasks._liveLayoutJson) {
+                tasks._liveLayoutJson = cfg;
+                if (tasks._activeSyncGroup) {
+                    TaskTools.updateSyncGroupLayout(tasks._activeSyncGroup, cfg, tasks._syncInstanceId);
+                    tasks._persistSyncGroupLayout(tasks._activeSyncGroup, cfg);
+                }
+            }
+        }
     }
 
     function _saveLayout(items) {
         var json = JSON.stringify(items);
+        _liveLayoutJson = json;
         Plasmoid.configuration.taskGroups = json;
-        if (!_syncReceiving && _activeProfile) {
-            TaskTools.updateProfile(_activeProfile, json, _syncInstanceId);
-            _writeProfileToFile(_activeProfile, json);
+        if (_activeSyncGroup) {
+            TaskTools.updateSyncGroupLayout(_activeSyncGroup, json, _syncInstanceId);
+            _persistSyncGroupLayout(_activeSyncGroup, json);
         }
     }
 
@@ -875,7 +906,6 @@ PlasmoidItem {
 
     Component.onCompleted: {
         TaskTools.taskManagerInstanceCount += 1;
-        _registerProfile();
         requestLayout.connect(iconGeometryTimer.restart);
 
         // Initialize layout if no groups are configured yet
@@ -897,6 +927,10 @@ PlasmoidItem {
             }
         }
 
+        // Set initial live state and join sync group
+        _liveLayoutJson = Plasmoid.configuration.taskGroups;
+        _joinSyncGroup();
+
         // Init exclusive mode claims
         if (Plasmoid.configuration.exclusiveMode && _claimsPath) {
             _writeClaims();
@@ -906,7 +940,7 @@ PlasmoidItem {
 
     Component.onDestruction: {
         TaskTools.taskManagerInstanceCount -= 1;
-        if (_activeProfile) TaskTools.unregisterProfile(_activeProfile, _syncInstanceId);
+        if (_activeSyncGroup) TaskTools.leaveSyncGroup(_activeSyncGroup, _syncInstanceId);
 
         // Clean up claims on destruction
         if (_claimsPath) {

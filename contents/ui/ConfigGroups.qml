@@ -70,9 +70,15 @@ KCMUtils.SimpleKCM {
 
     Component.onCompleted: {
         _loading = true;
+        // If in a sync group, read persisted layout from the shared file
+        var source = cfg_taskGroups;
+        if (cfg_syncGroup) {
+            var liveData = root._getSyncGroupLayout(cfg_syncGroup);
+            if (liveData && liveData !== "") source = liveData;
+        }
         var parsed = [];
-        if (cfg_taskGroups && cfg_taskGroups.trim() !== "") {
-            try { parsed = JSON.parse(cfg_taskGroups); }
+        if (source && source.trim() !== "") {
+            try { parsed = JSON.parse(source); }
             catch (e) { parsed = []; }
         }
         if (parsed.length === 0) {
@@ -82,7 +88,7 @@ KCMUtils.SimpleKCM {
         _loading = false;
         rebuildLayoutModel();
         scanDebounce.start();
-        _refreshProfiles();
+        _refreshSyncGroups();
     }
 
     // ── Helpers ──
@@ -205,61 +211,49 @@ KCMUtils.SimpleKCM {
 
     property int pickerTargetGroup: -1
 
-    // ── Layout profile state ──
-    property var _knownProfiles: []
+    // ── Sync group state ──
+    property var _knownSyncGroups: []
     property bool _showProfileNameInput: false
     property bool _renamingProfile: false
 
-    readonly property string _profilesPath: {
-        var url = Qt.resolvedUrl(".").toString();
-        var m = url.match(/^file:\/\/(\/[^\/]+\/[^\/]+)\//);
-        var home = m ? m[1] : "";
-        return home !== "" ? (home + "/.config/plasma-filteredtasks-profiles.conf") : "";
+    readonly property string _syncNamesPath: {
+        var home = root.homeDir;
+        return home !== "" ? (home + "/.config/plasma-filteredtasks-syncgroups.conf") : "";
     }
 
     LabSettings.Settings {
-        id: profileStore
-        fileName: root._profilesPath
-        category: "Profiles"
+        id: syncNamesStore
+        fileName: root._syncNamesPath
+        category: "SyncGroups"
     }
 
-    function _refreshProfiles() {
-        if (!_profilesPath) { _knownProfiles = []; return; }
-        profileStore.sync();
-        var names = String(profileStore.value("names", ""));
-        if (!names) { _knownProfiles = []; return; }
-        _knownProfiles = names.split("|").filter(function(n) { return n !== ""; });
+    function _refreshSyncGroups() {
+        // Read from file (works cross-process, so config dialog can see names
+        // registered by running plasmashell widgets)
+        if (!_syncNamesPath) { _knownSyncGroups = []; return; }
+        syncNamesStore.sync();
+        var names = String(syncNamesStore.value("names", ""));
+        if (!names) { _knownSyncGroups = []; return; }
+        _knownSyncGroups = names.split("|").filter(function(n) { return n !== ""; });
     }
 
-    function _getProfileData(name) {
-        if (!_profilesPath || !name) return "";
-        profileStore.sync();
-        return String(profileStore.value("profile_" + name, ""));
+    function _registerSyncGroupName(name) {
+        if (!_syncNamesPath || !name) return;
+        syncNamesStore.sync();
+        var names = String(syncNamesStore.value("names", ""));
+        var arr = names ? names.split("|").filter(function(n) { return n !== ""; }) : [];
+        if (arr.indexOf(name) < 0) {
+            arr.push(name);
+            syncNamesStore.setValue("names", arr.join("|"));
+            syncNamesStore.sync();
+        }
+        _refreshSyncGroups();
     }
 
-    function _removeProfile(name) {
-        if (!_profilesPath || !name) return;
-        profileStore.sync();
-        var names = String(profileStore.value("names", ""));
-        var arr = names ? names.split("|") : [];
-        arr = arr.filter(function(n) { return n !== name; });
-        profileStore.setValue("names", arr.join("|"));
-        profileStore.setValue("profile_" + name, "");
-        profileStore.sync();
-    }
-
-    function _renameProfile(oldName, newName) {
-        if (!_profilesPath || !oldName || !newName || oldName === newName) return;
-        profileStore.sync();
-        var data = String(profileStore.value("profile_" + oldName, ""));
-        var names = String(profileStore.value("names", ""));
-        var arr = names ? names.split("|") : [];
-        arr = arr.filter(function(n) { return n !== oldName; });
-        if (arr.indexOf(newName) < 0) arr.push(newName);
-        profileStore.setValue("names", arr.join("|"));
-        profileStore.setValue("profile_" + newName, data);
-        profileStore.setValue("profile_" + oldName, "");
-        profileStore.sync();
+    function _getSyncGroupLayout(name) {
+        if (!_syncNamesPath || !name) return "";
+        syncNamesStore.sync();
+        return String(syncNamesStore.value("layout_" + name, ""));
     }
 
     // ── UI ──
@@ -296,12 +290,12 @@ KCMUtils.SimpleKCM {
 
                 model: {
                     var items = [];
-                    // Current profile first (if set)
+                    // Current sync group first (if set)
                     if (cfg_syncGroup) {
                         items.push({text: cfg_syncGroup, value: cfg_syncGroup});
                     }
-                    // Other known profiles
-                    var known = root._knownProfiles;
+                    // Other known sync groups
+                    var known = root._knownSyncGroups;
                     for (var i = 0; i < known.length; i++) {
                         if (known[i] !== cfg_syncGroup) {
                             items.push({text: known[i], value: known[i]});
@@ -327,15 +321,15 @@ KCMUtils.SimpleKCM {
                     } else {
                         cfg_syncGroup = entry.value;
                         root._showProfileNameInput = false;
-                        // Load the profile's layout into the config UI
-                        var profileData = root._getProfileData(entry.value);
-                        if (profileData && profileData !== "") {
+                        // Load persisted layout for this sync group into the config UI
+                        var liveData = root._getSyncGroupLayout(entry.value);
+                        if (liveData && liveData !== "") {
                             root._loading = true;
                             try {
-                                var parsed = JSON.parse(profileData);
+                                var parsed = JSON.parse(liveData);
                                 if (parsed.length > 0) {
                                     root.layoutItems = parsed;
-                                    cfg_taskGroups = profileData;
+                                    cfg_taskGroups = liveData;
                                 }
                             } catch(e) {}
                             root._loading = false;
@@ -362,13 +356,12 @@ KCMUtils.SimpleKCM {
             QQC2.ToolButton {
                 icon.name: "edit-delete"
                 visible: cfg_syncGroup !== ""
-                QQC2.ToolTip.text: i18n("Remove profile (keeps current layout)")
+                QQC2.ToolTip.text: i18n("Leave sync group (keeps current layout)")
                 QQC2.ToolTip.visible: hovered
                 onClicked: {
-                    root._removeProfile(cfg_syncGroup);
                     cfg_syncGroup = "";
                     root._showProfileNameInput = false;
-                    root._refreshProfiles();
+                    root._refreshSyncGroups();
                 }
             }
         }
@@ -385,13 +378,10 @@ KCMUtils.SimpleKCM {
                 function commit() {
                     var name = text.trim();
                     if (name === "") return;
-                    if (root._renamingProfile && cfg_syncGroup) {
-                        root._renameProfile(cfg_syncGroup, name);
-                    }
                     cfg_syncGroup = name;
+                    root._registerSyncGroupName(name);
                     root._showProfileNameInput = false;
                     root._renamingProfile = false;
-                    root._refreshProfiles();
                 }
 
                 onAccepted: commit()
@@ -417,14 +407,14 @@ KCMUtils.SimpleKCM {
             Layout.fillWidth: true
             text: {
                 if (cfg_syncGroup) {
-                    var found = root._knownProfiles.indexOf(cfg_syncGroup) >= 0;
+                    var found = root._knownSyncGroups.indexOf(cfg_syncGroup) >= 0;
                     if (found) {
-                        return i18n("Synced with profile \"%1\". Changes on any widget using this profile are shared instantly.", cfg_syncGroup);
+                        return i18n("Synced with group \"%1\". Changes on any widget using this group are shared instantly.", cfg_syncGroup);
                     } else {
-                        return i18n("Profile \"%1\" will be created when you apply. Other widgets can then join it.", cfg_syncGroup);
+                        return i18n("Group \"%1\" will be created when you apply. Other widgets can then join it.", cfg_syncGroup);
                     }
                 }
-                return i18n("No profile. Select an existing profile from the dropdown to sync, or create a new one.");
+                return i18n("No sync group. Select an existing group from the dropdown, or create a new one.");
             }
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont

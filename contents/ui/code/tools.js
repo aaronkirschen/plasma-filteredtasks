@@ -14,92 +14,72 @@
 // Can't be `let`, or else QML counterpart won't be able to assign to it.
 var taskManagerInstanceCount = 0;
 
-// ── Layout profile registry ──
-// Shared across all plasmoid instances in the same plasmashell process.
-// Key = profile name, Value = {data: jsonString, instances: [{id, callback}]}
-var _profileRegistry = {};
-var _profileChangeListeners = [];
+// ── Sync group registry (single source of truth) ──
+// Shared across all plasmoid instances via .pragma library.
+// Key = group name, Value = {layoutJson: string, subscribers: [{id, onLayoutChanged}]}
+var _syncGroups = {};
+var _syncGroupChangeListeners = [];
 
-function getProfileNames() {
-    return Object.keys(_profileRegistry);
+function getSyncGroupNames() {
+    return Object.keys(_syncGroups);
 }
 
-function getProfileData(profileName) {
-    if (!profileName || !_profileRegistry[profileName]) return null;
-    return _profileRegistry[profileName].data;
+function getSyncGroupLayout(name) {
+    if (!name || !_syncGroups[name]) return null;
+    return _syncGroups[name].layoutJson;
 }
 
-// Register an instance to a profile. Returns the current profile data (or null if new).
-function registerProfile(profileName, instanceId, callback, initialData) {
-    if (!profileName) return null;
-    if (!_profileRegistry[profileName]) {
-        _profileRegistry[profileName] = {data: initialData || "", instances: []};
+// Join a sync group. Returns existing layout JSON, or null if this is a new group.
+function joinSyncGroup(name, instanceId, callback, initialLayoutJson) {
+    if (!name) return null;
+    if (!_syncGroups[name]) {
+        _syncGroups[name] = {layoutJson: initialLayoutJson || "", subscribers: []};
     }
-    var profile = _profileRegistry[profileName];
-    // Avoid duplicate registration
-    for (var i = 0; i < profile.instances.length; i++) {
-        if (profile.instances[i].id === instanceId) return profile.data;
+    var group = _syncGroups[name];
+    // Avoid duplicate subscription
+    for (var i = 0; i < group.subscribers.length; i++) {
+        if (group.subscribers[i].id === instanceId) return group.layoutJson;
     }
-    profile.instances.push({id: instanceId, callback: callback});
-    _notifyProfileChange();
-    return profile.data;
+    group.subscribers.push({id: instanceId, onLayoutChanged: callback});
+    _notifySyncGroupChange();
+    return group.layoutJson;
 }
 
-function unregisterProfile(profileName, instanceId) {
-    if (!profileName || !_profileRegistry[profileName]) return;
-    var profile = _profileRegistry[profileName];
-    profile.instances = profile.instances.filter(function(e) {
-        return e.id !== instanceId;
+function leaveSyncGroup(name, instanceId) {
+    if (!name || !_syncGroups[name]) return;
+    var group = _syncGroups[name];
+    group.subscribers = group.subscribers.filter(function(s) {
+        return s.id !== instanceId;
     });
-    if (profile.instances.length === 0) delete _profileRegistry[profileName];
-    _notifyProfileChange();
+    if (group.subscribers.length === 0) delete _syncGroups[name];
+    _notifySyncGroupChange();
 }
 
-// Update profile data and broadcast to all other instances on this profile.
-function updateProfile(profileName, data, senderId) {
-    if (!profileName || !_profileRegistry[profileName]) return;
-    _profileRegistry[profileName].data = data;
-    var instances = _profileRegistry[profileName].instances;
-    for (var i = 0; i < instances.length; i++) {
-        if (instances[i].id !== senderId) {
-            instances[i].callback(data);
+// Update layout and broadcast to all subscribers except the sender.
+function updateSyncGroupLayout(name, newLayoutJson, senderId) {
+    if (!name || !_syncGroups[name]) return;
+    _syncGroups[name].layoutJson = newLayoutJson;
+    var subs = _syncGroups[name].subscribers;
+    for (var i = 0; i < subs.length; i++) {
+        if (subs[i].id !== senderId) {
+            subs[i].onLayoutChanged(newLayoutJson);
         }
     }
 }
 
-function deleteProfile(profileName) {
-    if (!profileName || !_profileRegistry[profileName]) return;
-    delete _profileRegistry[profileName];
-    _notifyProfileChange();
+function addSyncGroupChangeListener(cb) {
+    _syncGroupChangeListeners.push(cb);
 }
 
-function renameProfile(oldName, newName) {
-    if (!oldName || !newName || oldName === newName) return;
-    if (!_profileRegistry[oldName]) return;
-    _profileRegistry[newName] = _profileRegistry[oldName];
-    delete _profileRegistry[oldName];
-    // Notify all instances on this profile about the name change
-    var instances = _profileRegistry[newName].instances;
-    for (var i = 0; i < instances.length; i++) {
-        if (instances[i].onRenamed) instances[i].onRenamed(newName);
-    }
-    _notifyProfileChange();
-}
-
-// Profile list change listeners (for config UI dropdowns)
-function addProfileChangeListener(callback) {
-    _profileChangeListeners.push(callback);
-}
-
-function removeProfileChangeListener(callback) {
-    _profileChangeListeners = _profileChangeListeners.filter(function(cb) {
-        return cb !== callback;
+function removeSyncGroupChangeListener(cb) {
+    _syncGroupChangeListeners = _syncGroupChangeListeners.filter(function(f) {
+        return f !== cb;
     });
 }
 
-function _notifyProfileChange() {
-    for (var i = 0; i < _profileChangeListeners.length; i++) {
-        _profileChangeListeners[i]();
+function _notifySyncGroupChange() {
+    for (var i = 0; i < _syncGroupChangeListeners.length; i++) {
+        _syncGroupChangeListeners[i]();
     }
 }
 
