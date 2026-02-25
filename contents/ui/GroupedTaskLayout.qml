@@ -296,14 +296,65 @@ Item {
 
     function taskAtPosition(x, y) {
         var rep = tasks.vertical ? repeaterV : repeaterH;
+        var isDragging = !!tasks.dragSource;
+        var isVert = tasks.vertical;
         for (var g = 0; g < rep.count; g++) {
             var section = rep.itemAt(g);
             if (!section || !section.isGroup) continue;
             var flow = section.taskFlow;
             if (!flow) continue;
+
+            // Only consider this section if the cursor is within its bounds
+            var sectionPos = section.mapFromItem(groupedLayout, x, y);
+            if (sectionPos.x < 0 || sectionPos.x > section.width
+                || sectionPos.y < 0 || sectionPos.y > section.height) {
+                continue;
+            }
+
             var localPos = flow.mapFromItem(groupedLayout, x, y);
-            var child = flow.childAt(localPos.x, localPos.y);
-            if (child) return child;
+
+            if (!isDragging) {
+                // Non-drag: exact hit-test (for tooltips, activation, etc.)
+                var child = flow.childAt(localPos.x, localPos.y);
+                if (child) return child;
+                continue;
+            }
+
+            // During a drag: find the child whose midpoint the cursor has
+            // crossed. This gives a natural "swap at 50%" feel.
+            var cursor = isVert ? localPos.y : localPos.x;
+            var bestTask = null;
+            for (var c = 0; c < flow.children.length; c++) {
+                var t = flow.children[c];
+                if (!t || !t.visible || t.appId === undefined) continue;
+                var start = isVert ? t.y : t.x;
+                var size = isVert ? t.height : t.width;
+                var mid = start + size / 2;
+                // The swap target is the last child whose midpoint the
+                // cursor has reached or passed.
+                if (cursor >= mid) {
+                    bestTask = t;
+                } else if (cursor >= start) {
+                    // Cursor is in the first half of this child — it stays
+                    // in its current position; return whatever we found so far
+                    // (or this child itself if nothing before it matched).
+                    if (!bestTask) bestTask = t;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            // If cursor is before all children, return the first one
+            if (!bestTask && flow.children.length > 0) {
+                for (var f = 0; f < flow.children.length; f++) {
+                    var ft = flow.children[f];
+                    if (ft && ft.visible && ft.appId !== undefined) {
+                        bestTask = ft;
+                        break;
+                    }
+                }
+            }
+            if (bestTask) return bestTask;
         }
         return null;
     }
