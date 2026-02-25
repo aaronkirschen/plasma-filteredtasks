@@ -171,9 +171,41 @@ Item {
         }
     }
 
+    // Return the visual index of a task within its parent Flow (0-based),
+    // or -1 if not found. Only counts visible task children with appId.
+    function visualIndexInFlow(task) {
+        if (!task || !task.parent) return -1;
+        var flow = task.parent;
+        var idx = 0;
+        for (var c = 0; c < flow.children.length; c++) {
+            var child = flow.children[c];
+            if (child === task) return idx;
+            if (child && child.visible && child.appId !== undefined) idx++;
+        }
+        return -1;
+    }
+
+    // Move an app to a specific visual position within a group's appIds.
+    // Updates layoutItems in-place for immediate visual effect without
+    // triggering the full _saveLayout → config persistence chain.
+    // Returns true if a change was made.
+    function moveAppIdToPosition(groupIdx, appId, targetVisualIndex) {
+        var itemData = layoutItems[groupIdx];
+        if (!itemData) return false;
+        var ids = itemData.appIds || [];
+        var fromIdx = ids.indexOf(appId);
+        if (fromIdx < 0 || targetVisualIndex < 0 || targetVisualIndex >= ids.length) return false;
+        if (fromIdx === targetVisualIndex) return false;
+        // Mutate in place for speed — we'll persist on drop
+        ids.splice(fromIdx, 1);
+        ids.splice(targetVisualIndex, 0, appId);
+        _dragDirty = true;
+        return true;
+    }
+
     // Reorder a single group's Flow children to match current appIds order.
-    // Safe to call during a drag — detaches and re-adds all tasks in the
-    // group synchronously so parent references are correct when we return.
+    // Detaches and re-adds all tasks synchronously so parent references
+    // are correct immediately after return.
     function reorderGroupFlow(groupIdx) {
         var container = containerForGroup(groupIdx);
         if (!container) return;
@@ -187,7 +219,7 @@ Item {
             orderMap[appIds[a]] = a;
         }
 
-        // Collect current task children of this Flow
+        // Collect task children of this Flow
         var children = [];
         for (var c = 0; c < container.children.length; c++) {
             var child = container.children[c];
@@ -217,27 +249,37 @@ Item {
         }
     }
 
+    // Persist current in-memory layoutItems to config and sync group.
+    function persistLayout() {
+        tasks._saveLayout(layoutItems);
+    }
+
     property bool _reparentPending: false
+    property bool _dragDirty: false  // true when in-memory appIds changed during drag
 
     onLayoutItemsChanged: {
         if (!tasks.dragSource) {
             _returnAllTasksToTaskList();
-        }
-        if (tasks.dragSource) {
-            // During a drag, defer reparent until drag ends to avoid
-            // disrupting parent references that MouseHandler relies on.
-            _reparentPending = true;
-        } else {
             _reparentTimer.restart();
+        } else {
+            // During a drag, defer full reparent until drag ends.
+            _reparentPending = true;
         }
     }
 
     Connections {
         target: tasks
         function onDragSourceChanged() {
-            if (!tasks.dragSource && groupedLayout._reparentPending) {
-                groupedLayout._reparentPending = false;
-                _reparentTimer.restart();
+            if (!tasks.dragSource) {
+                if (groupedLayout._dragDirty) {
+                    // Persist the in-memory appIds order that was built up during drag
+                    groupedLayout._dragDirty = false;
+                    groupedLayout.persistLayout();
+                }
+                if (groupedLayout._reparentPending) {
+                    groupedLayout._reparentPending = false;
+                    _reparentTimer.restart();
+                }
             }
         }
     }

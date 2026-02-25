@@ -88,39 +88,47 @@ DropArea {
         }
 
         if (tasksModel.sortMode === TaskManager.TasksModel.SortManual && tasks.dragSource) {
-            // Handle drags between different groups in grouped mode.
-            if (tasks.dragSource.parent !== above.parent) {
-                if (tasks.groupedMode && tasks.dragSource.groupIndex >= 0
-                    && above.groupIndex >= 0 && tasks.dragSource.groupIndex !== above.groupIndex) {
-                    tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, above.groupIndex);
-                }
-                return;
-            }
+            if (tasks.groupedMode) {
+                // ── Grouped mode drag: use visual position, not model index ──
 
-            const insertAt = above.index;
-
-            if (tasks.dragSource !== above && tasks.dragSource.index !== insertAt) {
-                const fromIndex = tasks.dragSource.index;
-
-                if (tasks.groupedMode) {
-                    // In grouped mode, skip tasksModel.move() — the Repeater's
-                    // internal stackBefore/stackAfter fails when delegates have
-                    // been reparented into Flow containers. Instead, update
-                    // appIds order in config (persists + syncs) and do an
-                    // immediate visual reorder of this group's Flow.
-                    tasks.reorderAppInGroup(tasks.dragSource.groupIndex,
-                        tasks.dragSource.appId, above.appId,
-                        fromIndex < insertAt);
-                    tasks.groupedLayout.reorderGroupFlow(tasks.dragSource.groupIndex);
-                } else if (tasks.groupDialog) {
-                    tasksModel.move(fromIndex, insertAt,
-                        tasksModel.makeModelIndex(tasks.groupDialog.visualParent.index));
-                } else {
-                    tasksModel.move(fromIndex, insertAt);
+                // Cross-group drag
+                if (tasks.dragSource.parent !== above.parent) {
+                    if (tasks.dragSource.groupIndex >= 0
+                        && above.groupIndex >= 0 && tasks.dragSource.groupIndex !== above.groupIndex) {
+                        tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, above.groupIndex);
+                    }
+                    return;
                 }
 
-                ignoredItem = above;
-                ignoreItemTimer.restart();
+                // Same-group drag: compare visual positions within the Flow
+                if (tasks.dragSource !== above) {
+                    var targetVisual = tasks.groupedLayout.visualIndexInFlow(above);
+                    if (targetVisual >= 0 && tasks.groupedLayout.moveAppIdToPosition(
+                            tasks.dragSource.groupIndex, tasks.dragSource.appId, targetVisual)) {
+                        tasks.groupedLayout.reorderGroupFlow(tasks.dragSource.groupIndex);
+                    }
+                }
+            } else {
+                // ── Non-grouped mode drag: use model index ──
+
+                // Different parent check (shouldn't happen without groupedMode, but kept for safety)
+                if (tasks.dragSource.parent !== above.parent) {
+                    return;
+                }
+
+                const insertAt = above.index;
+                if (tasks.dragSource !== above && tasks.dragSource.index !== insertAt) {
+                    const fromIndex = tasks.dragSource.index;
+                    if (tasks.groupDialog) {
+                        tasksModel.move(fromIndex, insertAt,
+                            tasksModel.makeModelIndex(tasks.groupDialog.visualParent.index));
+                    } else {
+                        tasksModel.move(fromIndex, insertAt);
+                    }
+
+                    ignoredItem = above;
+                    ignoreItemTimer.restart();
+                }
             }
         } else if (!tasks.dragSource && hoveredItem !== above) {
             hoveredItem = above;

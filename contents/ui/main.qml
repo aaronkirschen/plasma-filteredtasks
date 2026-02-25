@@ -260,27 +260,6 @@ PlasmoidItem {
         _saveLayout(items);
     }
 
-    function reorderAppInGroup(groupIdx, movedAppId, targetAppId, insertAfter) {
-        var items = parsedLayout.slice();
-        if (groupIdx < 0 || groupIdx >= items.length || items[groupIdx].type !== "group") return;
-        items[groupIdx] = Object.assign({}, items[groupIdx]);
-        var ids = (items[groupIdx].appIds || []).slice();
-        var movedIdx = ids.indexOf(movedAppId);
-        if (movedIdx < 0) return; // movedAppId not in this group's appIds
-        // Remove from current position
-        ids.splice(movedIdx, 1);
-        // Find target position
-        var targetIdx = ids.indexOf(targetAppId);
-        if (targetIdx < 0) return; // targetAppId not found
-        if (insertAfter) {
-            ids.splice(targetIdx + 1, 0, movedAppId);
-        } else {
-            ids.splice(targetIdx, 0, movedAppId);
-        }
-        items[groupIdx].appIds = ids;
-        _saveLayout(items);
-    }
-
     function addAppToNewGroup(appId, fromLayoutIdx, groupName) {
         var name = (groupName && groupName.trim() !== "") ? groupName.trim() : "New Group";
         var items = parsedLayout.slice();
