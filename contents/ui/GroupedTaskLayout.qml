@@ -100,17 +100,146 @@ Item {
     }
 
     function reparentAllTasks() {
+        // Build a map of groupIdx -> sorted task list
+        var groupTasks = {};  // groupIdx -> [task, ...]
         for (var i = 0; i < tasks.taskRepeater.count; i++) {
             var task = tasks.taskRepeater.itemAt(i);
-            if (task) reparentTask(task);
+            if (!task) continue;
+            var gIdx = groupForApp(task.appId);
+            if (gIdx < 0) {
+                task.visible = false;
+                continue;
+            }
+
+            var isUngrouped = layoutItems[gIdx].name === "__ungrouped";
+            if (isUngrouped && Plasmoid.configuration.exclusiveMode) {
+                var excluded = tasks.excludedByOthers;
+                var isExcluded = false;
+                if (excluded) {
+                    for (var k = 0; k < excluded.length; k++) {
+                        if (excluded[k] === task.appId) {
+                            isExcluded = true;
+                            break;
+                        }
+                    }
+                }
+                if (isExcluded) {
+                    task.visible = false;
+                    continue;
+                }
+            }
+
+            task.visible = true;
+            task.groupIndex = gIdx;
+            if (!groupTasks[gIdx]) groupTasks[gIdx] = [];
+            groupTasks[gIdx].push(task);
+        }
+
+        // For each group, sort tasks by appIds order, then reparent in order
+        for (var gIdx in groupTasks) {
+            var container = containerForGroup(parseInt(gIdx));
+            if (!container) continue;
+            var tasksInGroup = groupTasks[gIdx];
+            var itemData = layoutItems[parseInt(gIdx)] || {};
+            var appIds = itemData.appIds || [];
+
+            // Build order map
+            var orderMap = {};
+            for (var a = 0; a < appIds.length; a++) {
+                orderMap[appIds[a]] = a;
+            }
+
+            // Sort tasks: those in appIds by their order, others by model index
+            tasksInGroup.sort(function(a, b) {
+                var oa = (a.appId in orderMap) ? orderMap[a.appId] : 999999 + a.index;
+                var ob = (b.appId in orderMap) ? orderMap[b.appId] : 999999 + b.index;
+                return oa - ob;
+            });
+
+            // Detach all tasks to taskList, then reparent in sorted order.
+            // Flow uses insertion order, so this controls visual ordering.
+            for (var d = 0; d < tasksInGroup.length; d++) {
+                tasksInGroup[d].oldX = -1;
+                tasksInGroup[d].oldY = -1;
+                tasksInGroup[d].parent = tasks.taskList;
+            }
+            for (var r = 0; r < tasksInGroup.length; r++) {
+                tasksInGroup[r].oldX = -1;
+                tasksInGroup[r].oldY = -1;
+                tasksInGroup[r].parent = container;
+            }
         }
     }
+
+    // Reorder a single group's Flow children to match current appIds order.
+    // Safe to call during a drag — detaches and re-adds all tasks in the
+    // group synchronously so parent references are correct when we return.
+    function reorderGroupFlow(groupIdx) {
+        var container = containerForGroup(groupIdx);
+        if (!container) return;
+        var itemData = layoutItems[groupIdx] || {};
+        var appIds = itemData.appIds || [];
+        if (appIds.length < 2) return;
+
+        // Build order map
+        var orderMap = {};
+        for (var a = 0; a < appIds.length; a++) {
+            orderMap[appIds[a]] = a;
+        }
+
+        // Collect current task children of this Flow
+        var children = [];
+        for (var c = 0; c < container.children.length; c++) {
+            var child = container.children[c];
+            if (child && child.appId !== undefined) {
+                children.push(child);
+            }
+        }
+        if (children.length < 2) return;
+
+        // Sort by appIds order
+        children.sort(function(a, b) {
+            var oa = (a.appId in orderMap) ? orderMap[a.appId] : 999999 + a.index;
+            var ob = (b.appId in orderMap) ? orderMap[b.appId] : 999999 + b.index;
+            return oa - ob;
+        });
+
+        // Detach all then re-add in sorted order
+        for (var d = 0; d < children.length; d++) {
+            children[d].oldX = -1;
+            children[d].oldY = -1;
+            children[d].parent = tasks.taskList;
+        }
+        for (var r = 0; r < children.length; r++) {
+            children[r].oldX = -1;
+            children[r].oldY = -1;
+            children[r].parent = container;
+        }
+    }
+
+    property bool _reparentPending: false
 
     onLayoutItemsChanged: {
         if (!tasks.dragSource) {
             _returnAllTasksToTaskList();
         }
-        _reparentTimer.restart();
+        if (tasks.dragSource) {
+            // During a drag, defer reparent until drag ends to avoid
+            // disrupting parent references that MouseHandler relies on.
+            _reparentPending = true;
+        } else {
+            _reparentTimer.restart();
+        }
+    }
+
+    Connections {
+        target: tasks
+        function onDragSourceChanged() {
+            if (!tasks.dragSource && groupedLayout._reparentPending) {
+                groupedLayout._reparentPending = false;
+                _reparentTimer.restart();
+            }
+        }
     }
 
     Timer {

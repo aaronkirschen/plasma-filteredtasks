@@ -102,19 +102,21 @@ DropArea {
             if (tasks.dragSource !== above && tasks.dragSource.index !== insertAt) {
                 const fromIndex = tasks.dragSource.index;
 
-                if (tasks.groupDialog) {
+                if (tasks.groupedMode) {
+                    // In grouped mode, skip tasksModel.move() — the Repeater's
+                    // internal stackBefore/stackAfter fails when delegates have
+                    // been reparented into Flow containers. Instead, update
+                    // appIds order in config (persists + syncs) and do an
+                    // immediate visual reorder of this group's Flow.
+                    tasks.reorderAppInGroup(tasks.dragSource.groupIndex,
+                        tasks.dragSource.appId, above.appId,
+                        fromIndex < insertAt);
+                    tasks.groupedLayout.reorderGroupFlow(tasks.dragSource.groupIndex);
+                } else if (tasks.groupDialog) {
                     tasksModel.move(fromIndex, insertAt,
                         tasksModel.makeModelIndex(tasks.groupDialog.visualParent.index));
                 } else {
                     tasksModel.move(fromIndex, insertAt);
-                }
-
-                if (tasks.groupedMode) {
-                    if (fromIndex < insertAt) {
-                        tasks.dragSource.stackAfter(above);
-                    } else {
-                        tasks.dragSource.stackBefore(above);
-                    }
                 }
 
                 ignoredItem = above;
