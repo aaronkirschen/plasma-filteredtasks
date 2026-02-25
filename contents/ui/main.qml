@@ -46,6 +46,10 @@ PlasmoidItem {
     // Set from the shared sync group in tools.js, or from local config if not syncing.
     property string _liveLayoutJson: ""
 
+    // Live launchers JSON — tracks the last launcher list we sent/received via sync,
+    // used to avoid feedback loops (same pattern as _liveLayoutJson).
+    property string _liveLaunchersJson: ""
+
     // Parsed layout: mixed array of group and spacer items from config
     readonly property var parsedLayout: {
         var raw = _liveLayoutJson;
@@ -196,15 +200,26 @@ PlasmoidItem {
             _liveLayoutJson = Plasmoid.configuration.taskGroups;
             return;
         }
-        // Join the group; returns existing layout if another widget is already in it
-        var existing = TaskTools.joinSyncGroup(name, _syncInstanceId, _onSyncLayoutChanged, Plasmoid.configuration.taskGroups);
-        if (existing && existing !== "") {
-            // Adopt the group's current state
-            _liveLayoutJson = existing;
-            Plasmoid.configuration.taskGroups = existing;
+        // Join the group; returns existing layout and launchers if another widget is already in it
+        var localLaunchers = JSON.stringify(Plasmoid.configuration.launchers);
+        var result = TaskTools.joinSyncGroup(name, _syncInstanceId,
+            _onSyncLayoutChanged, Plasmoid.configuration.taskGroups,
+            _onSyncLaunchersChanged, localLaunchers);
+        // Adopt layout
+        if (result.layout && result.layout !== "") {
+            _liveLayoutJson = result.layout;
+            Plasmoid.configuration.taskGroups = result.layout;
         } else {
-            // We're the first widget — seed from our local config
             _liveLayoutJson = Plasmoid.configuration.taskGroups;
+        }
+        // Adopt launchers
+        if (result.launchers && result.launchers !== "") {
+            _liveLaunchersJson = result.launchers;
+            var launcherList = JSON.parse(result.launchers);
+            tasksModel.launcherList = launcherList;
+            Plasmoid.configuration.launchers = launcherList;
+        } else {
+            _liveLaunchersJson = localLaunchers;
         }
         // Register name to file so config dialogs can discover it
         _registerSyncGroupName(name);
@@ -213,6 +228,13 @@ PlasmoidItem {
     function _onSyncLayoutChanged(newJson) {
         _liveLayoutJson = newJson;
         Plasmoid.configuration.taskGroups = newJson;
+    }
+
+    function _onSyncLaunchersChanged(newLaunchersJson) {
+        _liveLaunchersJson = newLaunchersJson;
+        var launcherList = JSON.parse(newLaunchersJson);
+        tasksModel.launcherList = launcherList;
+        Plasmoid.configuration.launchers = launcherList;
     }
 
     Connections {
@@ -500,6 +522,11 @@ PlasmoidItem {
 
         onLauncherListChanged: {
             Plasmoid.configuration.launchers = launcherList;
+            var json = JSON.stringify(launcherList);
+            if (tasks._activeSyncGroup && json !== tasks._liveLaunchersJson) {
+                tasks._liveLaunchersJson = json;
+                TaskTools.updateSyncGroupLaunchers(tasks._activeSyncGroup, json, tasks._syncInstanceId);
+            }
         }
 
         onGroupingAppIdBlacklistChanged: {
@@ -645,7 +672,13 @@ PlasmoidItem {
             target: Plasmoid.configuration
 
             function onLaunchersChanged(): void {
-                tasksModel.launcherList = Plasmoid.configuration.launchers
+                tasksModel.launcherList = Plasmoid.configuration.launchers;
+                // Pick up external config changes (e.g. from another process)
+                var json = JSON.stringify(Plasmoid.configuration.launchers);
+                if (tasks._activeSyncGroup && json !== tasks._liveLaunchersJson) {
+                    tasks._liveLaunchersJson = json;
+                    TaskTools.updateSyncGroupLaunchers(tasks._activeSyncGroup, json, tasks._syncInstanceId);
+                }
             }
             function onGroupingAppIdBlacklistChanged(): void {
                 tasksModel.groupingAppIdBlacklist = Plasmoid.configuration.groupingAppIdBlacklist;

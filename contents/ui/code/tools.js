@@ -16,7 +16,7 @@ var taskManagerInstanceCount = 0;
 
 // ── Sync group registry (single source of truth) ──
 // Shared across all plasmoid instances via .pragma library.
-// Key = group name, Value = {layoutJson: string, subscribers: [{id, onLayoutChanged}]}
+// Key = group name, Value = {layoutJson, launchersJson, subscribers: [{id, onLayoutChanged, onLaunchersChanged}]}
 var _syncGroups = {};
 var _syncGroupChangeListeners = [];
 
@@ -29,20 +29,25 @@ function getSyncGroupLayout(name) {
     return _syncGroups[name].layoutJson;
 }
 
-// Join a sync group. Returns existing layout JSON, or null if this is a new group.
-function joinSyncGroup(name, instanceId, callback, initialLayoutJson) {
-    if (!name) return null;
+function getSyncGroupLaunchers(name) {
+    if (!name || !_syncGroups[name]) return null;
+    return _syncGroups[name].launchersJson;
+}
+
+// Join a sync group. Returns {layout, launchers} with existing data, or null values if new group.
+function joinSyncGroup(name, instanceId, layoutCallback, initialLayoutJson, launcherCallback, initialLaunchersJson) {
+    if (!name) return {layout: null, launchers: null};
     if (!_syncGroups[name]) {
-        _syncGroups[name] = {layoutJson: initialLayoutJson || "", subscribers: []};
+        _syncGroups[name] = {layoutJson: initialLayoutJson || "", launchersJson: initialLaunchersJson || "", subscribers: []};
     }
     var group = _syncGroups[name];
     // Avoid duplicate subscription
     for (var i = 0; i < group.subscribers.length; i++) {
-        if (group.subscribers[i].id === instanceId) return group.layoutJson;
+        if (group.subscribers[i].id === instanceId) return {layout: group.layoutJson, launchers: group.launchersJson};
     }
-    group.subscribers.push({id: instanceId, onLayoutChanged: callback});
+    group.subscribers.push({id: instanceId, onLayoutChanged: layoutCallback, onLaunchersChanged: launcherCallback});
     _notifySyncGroupChange();
-    return group.layoutJson;
+    return {layout: group.layoutJson, launchers: group.launchersJson};
 }
 
 function leaveSyncGroup(name, instanceId) {
@@ -63,6 +68,18 @@ function updateSyncGroupLayout(name, newLayoutJson, senderId) {
     for (var i = 0; i < subs.length; i++) {
         if (subs[i].id !== senderId) {
             subs[i].onLayoutChanged(newLayoutJson);
+        }
+    }
+}
+
+// Update launchers and broadcast to all subscribers except the sender.
+function updateSyncGroupLaunchers(name, newLaunchersJson, senderId) {
+    if (!name || !_syncGroups[name]) return;
+    _syncGroups[name].launchersJson = newLaunchersJson;
+    var subs = _syncGroups[name].subscribers;
+    for (var i = 0; i < subs.length; i++) {
+        if (subs[i].id !== senderId) {
+            subs[i].onLaunchersChanged(newLaunchersJson);
         }
     }
 }
