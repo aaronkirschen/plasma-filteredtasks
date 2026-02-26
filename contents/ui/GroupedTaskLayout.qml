@@ -15,25 +15,52 @@ Item {
 
     property var layoutItems: []
     property bool animating: false
-    // 0 = Left, 1 = Right, 2 = Center, 3 = No Fill (no fillers active)
-    property int alignment: 0
     property int dropTargetGroupIndex: -1
+
+    // Split layoutItems into left-floated and right-floated arrays.
+    // Each entry is {origIndex, data} so delegates can map back to layoutItems.
+    readonly property var leftItems: {
+        var arr = [];
+        for (var i = 0; i < layoutItems.length; i++) {
+            var item = layoutItems[i];
+            if ((item["float"] || "left") === "left")
+                arr.push({origIndex: i, data: item});
+        }
+        return arr;
+    }
+    readonly property var rightItems: {
+        var arr = [];
+        for (var i = 0; i < layoutItems.length; i++) {
+            var item = layoutItems[i];
+            if ((item["float"] || "left") === "right")
+                arr.push({origIndex: i, data: item});
+        }
+        return arr;
+    }
+
+    // Whether we have any right-floated items (controls fill visibility)
+    readonly property bool hasRightItems: rightItems.length > 0
 
     implicitWidth: tasks.vertical ? groupColumn.implicitWidth : groupRow.implicitWidth
     implicitHeight: tasks.vertical ? groupColumn.implicitHeight : groupRow.implicitHeight
 
     readonly property real minimumWidth: {
-        var rep = tasks.vertical ? repeaterV : repeaterH;
         var min = Infinity;
-        for (var g = 0; g < rep.count; g++) {
-            var section = rep.itemAt(g);
-            if (!section || !section.isGroup) continue;
-            var flow = section.taskFlow;
-            if (!flow) continue;
-            for (var c = 0; c < flow.children.length; c++) {
-                var child = flow.children[c];
-                if (child.visible && child.width > 0) {
-                    min = Math.min(min, child.width);
+        var repeaters = tasks.vertical
+            ? [repeaterLeftV, repeaterRightV]
+            : [repeaterLeftH, repeaterRightH];
+        for (var r = 0; r < repeaters.length; r++) {
+            var rep = repeaters[r];
+            for (var g = 0; g < rep.count; g++) {
+                var section = rep.itemAt(g);
+                if (!section || !section.isGroup) continue;
+                var flow = section.taskFlow;
+                if (!flow) continue;
+                for (var c = 0; c < flow.children.length; c++) {
+                    var child = flow.children[c];
+                    if (child.visible && child.width > 0) {
+                        min = Math.min(min, child.width);
+                    }
                 }
             }
         }
@@ -294,10 +321,8 @@ Item {
         _reparentTimer.restart();
     }
 
-    function taskAtPosition(x, y) {
-        var rep = tasks.vertical ? repeaterV : repeaterH;
-        var isDragging = !!tasks.dragSource;
-        var isVert = tasks.vertical;
+    // Helper: search a repeater for a task at position
+    function _searchRepeaterForTask(rep, x, y, isDragging, isVert) {
         for (var g = 0; g < rep.count; g++) {
             var section = rep.itemAt(g);
             if (!section || !section.isGroup) continue;
@@ -314,14 +339,11 @@ Item {
             var localPos = flow.mapFromItem(groupedLayout, x, y);
 
             if (!isDragging) {
-                // Non-drag: exact hit-test (for tooltips, activation, etc.)
                 var child = flow.childAt(localPos.x, localPos.y);
                 if (child) return child;
                 continue;
             }
 
-            // During a drag: find the child whose midpoint the cursor has
-            // crossed. This gives a natural "swap at 50%" feel.
             var cursor = isVert ? localPos.y : localPos.x;
             var bestTask = null;
             for (var c = 0; c < flow.children.length; c++) {
@@ -330,21 +352,15 @@ Item {
                 var start = isVert ? t.y : t.x;
                 var size = isVert ? t.height : t.width;
                 var mid = start + size / 2;
-                // The swap target is the last child whose midpoint the
-                // cursor has reached or passed.
                 if (cursor >= mid) {
                     bestTask = t;
                 } else if (cursor >= start) {
-                    // Cursor is in the first half of this child — it stays
-                    // in its current position; return whatever we found so far
-                    // (or this child itself if nothing before it matched).
                     if (!bestTask) bestTask = t;
                     break;
                 } else {
                     break;
                 }
             }
-            // If cursor is before all children, return the first one
             if (!bestTask && flow.children.length > 0) {
                 for (var f = 0; f < flow.children.length; f++) {
                     var ft = flow.children[f];
@@ -359,18 +375,36 @@ Item {
         return null;
     }
 
-    function groupIndexAtPosition(x, y) {
-        var rep = tasks.vertical ? repeaterV : repeaterH;
+    function taskAtPosition(x, y) {
+        var isDragging = !!tasks.dragSource;
+        var isVert = tasks.vertical;
+        var repL = isVert ? repeaterLeftV : repeaterLeftH;
+        var repR = isVert ? repeaterRightV : repeaterRightH;
+        var result = _searchRepeaterForTask(repL, x, y, isDragging, isVert);
+        if (result) return result;
+        return _searchRepeaterForTask(repR, x, y, isDragging, isVert);
+    }
+
+    // Helper: search a repeater for a group at position
+    function _searchRepeaterForGroup(rep, x, y) {
         for (var g = 0; g < rep.count; g++) {
             var section = rep.itemAt(g);
             if (!section || !section.isGroup) continue;
             var localPos = section.mapFromItem(groupedLayout, x, y);
             if (localPos.x >= 0 && localPos.x <= section.width
                 && localPos.y >= 0 && localPos.y <= section.height) {
-                return section.index;
+                return section.origIndex;
             }
         }
         return -1;
+    }
+
+    function groupIndexAtPosition(x, y) {
+        var repL = tasks.vertical ? repeaterLeftV : repeaterLeftH;
+        var repR = tasks.vertical ? repeaterRightV : repeaterRightH;
+        var result = _searchRepeaterForGroup(repL, x, y);
+        if (result >= 0) return result;
+        return _searchRepeaterForGroup(repR, x, y);
     }
 
     // ── Horizontal panel ──
@@ -380,29 +414,28 @@ Item {
         spacing: 0
         visible: !tasks.vertical
 
-        // Left filler: visible for Right-aligned and Centered
-        Item { Layout.fillWidth: groupedLayout.alignment === 1 || groupedLayout.alignment === 2 }
-
         Repeater {
-            id: repeaterH
-            model: groupedLayout.layoutItems.length
+            id: repeaterLeftH
+            model: groupedLayout.leftItems
 
             delegate: Item {
-                id: sectionH
+                id: sectionLH
+                required property var modelData
                 required property int index
 
-                readonly property var itemData: groupedLayout.layoutItems[index] || {}
+                readonly property int origIndex: modelData.origIndex
+                readonly property var itemData: modelData.data
                 readonly property bool isGroup: (itemData.type || "group") === "group"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
-                property Item taskFlow: isGroup ? flowH : null
+                property Item taskFlow: isGroup ? flowLH : null
                 readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentWidth: {
                     if (!isGroup) return 0;
                     var w = 0;
-                    for (var i = 0; i < flowH.children.length; i++) {
-                        var c = flowH.children[i];
+                    for (var i = 0; i < flowLH.children.length; i++) {
+                        var c = flowLH.children[i];
                         if (c.visible) w += c.implicitWidth;
                     }
                     return w;
@@ -412,24 +445,23 @@ Item {
                 Layout.maximumWidth: isSpacer ? spacerSize : contentWidth
 
                 Rectangle {
-                    visible: sectionH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource)
+                    visible: sectionLH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionLH.origIndex && tasks.dragSource)
                     anchors.fill: parent
-                    color: sectionH.itemColor || "transparent"
-                    border.color: (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource)
+                    color: sectionLH.itemColor || "transparent"
+                    border.color: (groupedLayout.dropTargetGroupIndex === sectionLH.origIndex && tasks.dragSource)
                         ? Kirigami.Theme.highlightColor : "transparent"
-                    border.width: (groupedLayout.dropTargetGroupIndex === sectionH.index && tasks.dragSource) ? 2 : 0
+                    border.width: (groupedLayout.dropTargetGroupIndex === sectionLH.origIndex && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
                 Flow {
-                    id: flowH
-                    visible: sectionH.isGroup
+                    id: flowLH
+                    visible: sectionLH.isGroup
                     anchors.fill: parent
                     spacing: 0
                     LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
                     LayoutMirroring.childrenInherit: true
 
-                    // Task.qml reads task.parent.minimumWidth for icon sizing
                     readonly property real minimumWidth: {
                         var min = Infinity;
                         for (var i = 0; i < children.length; i++) {
@@ -444,21 +476,21 @@ Item {
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionH.isGroup
+                    enabled: sectionLH.isGroup
                     onTapped: function(eventPoint) {
-                        var localPos = flowH.mapFromItem(sectionH, eventPoint.position.x, eventPoint.position.y);
-                        var child = flowH.childAt(localPos.x, localPos.y);
+                        var localPos = flowLH.mapFromItem(sectionLH, eventPoint.position.x, eventPoint.position.y);
+                        var child = flowLH.childAt(localPos.x, localPos.y);
                         if (!child) {
-                            groupedLayout.showSectionMenu(sectionH, sectionH.index);
+                            groupedLayout.showSectionMenu(sectionLH, sectionLH.origIndex);
                         }
                     }
                 }
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionH.isSpacer
+                    enabled: sectionLH.isSpacer
                     onTapped: {
-                        groupedLayout.showSpacerMenu(sectionH, sectionH.index);
+                        groupedLayout.showSpacerMenu(sectionLH, sectionLH.origIndex);
                     }
                 }
 
@@ -466,8 +498,92 @@ Item {
             }
         }
 
-        // Right filler: visible for Left-aligned and Centered
-        Item { Layout.fillWidth: groupedLayout.alignment === 0 || groupedLayout.alignment === 2 }
+        // Fill space between left and right groups
+        Item { Layout.fillWidth: true }
+
+        Repeater {
+            id: repeaterRightH
+            model: groupedLayout.rightItems
+
+            delegate: Item {
+                id: sectionRH
+                required property var modelData
+                required property int index
+
+                readonly property int origIndex: modelData.origIndex
+                readonly property var itemData: modelData.data
+                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSpacer: itemData.type === "spacer"
+                readonly property string itemColor: itemData.color || ""
+                property Item taskFlow: isGroup ? flowRH : null
+                readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
+
+                readonly property real contentWidth: {
+                    if (!isGroup) return 0;
+                    var w = 0;
+                    for (var i = 0; i < flowRH.children.length; i++) {
+                        var c = flowRH.children[i];
+                        if (c.visible) w += c.implicitWidth;
+                    }
+                    return w;
+                }
+                Layout.fillHeight: true
+                Layout.preferredWidth: isSpacer ? spacerSize : contentWidth
+                Layout.maximumWidth: isSpacer ? spacerSize : contentWidth
+
+                Rectangle {
+                    visible: sectionRH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionRH.origIndex && tasks.dragSource)
+                    anchors.fill: parent
+                    color: sectionRH.itemColor || "transparent"
+                    border.color: (groupedLayout.dropTargetGroupIndex === sectionRH.origIndex && tasks.dragSource)
+                        ? Kirigami.Theme.highlightColor : "transparent"
+                    border.width: (groupedLayout.dropTargetGroupIndex === sectionRH.origIndex && tasks.dragSource) ? 2 : 0
+                    radius: 4
+                }
+
+                Flow {
+                    id: flowRH
+                    visible: sectionRH.isGroup
+                    anchors.fill: parent
+                    spacing: 0
+                    LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
+                    LayoutMirroring.childrenInherit: true
+
+                    readonly property real minimumWidth: {
+                        var min = Infinity;
+                        for (var i = 0; i < children.length; i++) {
+                            var c = children[i];
+                            if (c.visible && c.width > 0)
+                                min = Math.min(min, c.width);
+                        }
+                        return min === Infinity ? 0 : min;
+                    }
+                    property int animationsRunning: 0
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionRH.isGroup
+                    onTapped: function(eventPoint) {
+                        var localPos = flowRH.mapFromItem(sectionRH, eventPoint.position.x, eventPoint.position.y);
+                        var child = flowRH.childAt(localPos.x, localPos.y);
+                        if (!child) {
+                            groupedLayout.showSectionMenu(sectionRH, sectionRH.origIndex);
+                        }
+                    }
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionRH.isSpacer
+                    onTapped: {
+                        groupedLayout.showSpacerMenu(sectionRH, sectionRH.origIndex);
+                    }
+                }
+
+                implicitWidth: isSpacer ? spacerSize : contentWidth
+            }
+        }
     }
 
     // ── Vertical panel ──
@@ -477,29 +593,28 @@ Item {
         spacing: 0
         visible: tasks.vertical
 
-        // Top filler: visible for Right(Bottom)-aligned and Centered
-        Item { Layout.fillHeight: groupedLayout.alignment === 1 || groupedLayout.alignment === 2 }
-
         Repeater {
-            id: repeaterV
-            model: groupedLayout.layoutItems.length
+            id: repeaterLeftV
+            model: groupedLayout.leftItems
 
             delegate: Item {
-                id: sectionV
+                id: sectionLV
+                required property var modelData
                 required property int index
 
-                readonly property var itemData: groupedLayout.layoutItems[index] || {}
+                readonly property int origIndex: modelData.origIndex
+                readonly property var itemData: modelData.data
                 readonly property bool isGroup: (itemData.type || "group") === "group"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
-                property Item taskFlow: isGroup ? flowV : null
+                property Item taskFlow: isGroup ? flowLV : null
                 readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentHeight: {
                     if (!isGroup) return 0;
                     var h = 0;
-                    for (var i = 0; i < flowV.children.length; i++) {
-                        var c = flowV.children[i];
+                    for (var i = 0; i < flowLV.children.length; i++) {
+                        var c = flowLV.children[i];
                         if (c.visible) h += c.implicitHeight;
                     }
                     return h;
@@ -509,18 +624,18 @@ Item {
                 Layout.maximumHeight: isSpacer ? spacerSize : contentHeight
 
                 Rectangle {
-                    visible: sectionV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource)
+                    visible: sectionLV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionLV.origIndex && tasks.dragSource)
                     anchors.fill: parent
-                    color: sectionV.itemColor || "transparent"
-                    border.color: (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource)
+                    color: sectionLV.itemColor || "transparent"
+                    border.color: (groupedLayout.dropTargetGroupIndex === sectionLV.origIndex && tasks.dragSource)
                         ? Kirigami.Theme.highlightColor : "transparent"
-                    border.width: (groupedLayout.dropTargetGroupIndex === sectionV.index && tasks.dragSource) ? 2 : 0
+                    border.width: (groupedLayout.dropTargetGroupIndex === sectionLV.origIndex && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
                 Flow {
-                    id: flowV
-                    visible: sectionV.isGroup
+                    id: flowLV
+                    visible: sectionLV.isGroup
                     anchors.fill: parent
                     spacing: 0
                     LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
@@ -540,21 +655,21 @@ Item {
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionV.isGroup
+                    enabled: sectionLV.isGroup
                     onTapped: function(eventPoint) {
-                        var localPos = flowV.mapFromItem(sectionV, eventPoint.position.x, eventPoint.position.y);
-                        var child = flowV.childAt(localPos.x, localPos.y);
+                        var localPos = flowLV.mapFromItem(sectionLV, eventPoint.position.x, eventPoint.position.y);
+                        var child = flowLV.childAt(localPos.x, localPos.y);
                         if (!child) {
-                            groupedLayout.showSectionMenu(sectionV, sectionV.index);
+                            groupedLayout.showSectionMenu(sectionLV, sectionLV.origIndex);
                         }
                     }
                 }
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionV.isSpacer
+                    enabled: sectionLV.isSpacer
                     onTapped: {
-                        groupedLayout.showSpacerMenu(sectionV, sectionV.index);
+                        groupedLayout.showSpacerMenu(sectionLV, sectionLV.origIndex);
                     }
                 }
 
@@ -562,16 +677,111 @@ Item {
             }
         }
 
-        // Bottom filler: visible for Left(Top)-aligned and Centered
-        Item { Layout.fillHeight: groupedLayout.alignment === 0 || groupedLayout.alignment === 2 }
+        // Fill space between top (left-floated) and bottom (right-floated) groups
+        Item { Layout.fillHeight: true }
+
+        Repeater {
+            id: repeaterRightV
+            model: groupedLayout.rightItems
+
+            delegate: Item {
+                id: sectionRV
+                required property var modelData
+                required property int index
+
+                readonly property int origIndex: modelData.origIndex
+                readonly property var itemData: modelData.data
+                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSpacer: itemData.type === "spacer"
+                readonly property string itemColor: itemData.color || ""
+                property Item taskFlow: isGroup ? flowRV : null
+                readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
+
+                readonly property real contentHeight: {
+                    if (!isGroup) return 0;
+                    var h = 0;
+                    for (var i = 0; i < flowRV.children.length; i++) {
+                        var c = flowRV.children[i];
+                        if (c.visible) h += c.implicitHeight;
+                    }
+                    return h;
+                }
+                Layout.fillWidth: true
+                Layout.preferredHeight: isSpacer ? spacerSize : contentHeight
+                Layout.maximumHeight: isSpacer ? spacerSize : contentHeight
+
+                Rectangle {
+                    visible: sectionRV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionRV.origIndex && tasks.dragSource)
+                    anchors.fill: parent
+                    color: sectionRV.itemColor || "transparent"
+                    border.color: (groupedLayout.dropTargetGroupIndex === sectionRV.origIndex && tasks.dragSource)
+                        ? Kirigami.Theme.highlightColor : "transparent"
+                    border.width: (groupedLayout.dropTargetGroupIndex === sectionRV.origIndex && tasks.dragSource) ? 2 : 0
+                    radius: 4
+                }
+
+                Flow {
+                    id: flowRV
+                    visible: sectionRV.isGroup
+                    anchors.fill: parent
+                    spacing: 0
+                    LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
+                    LayoutMirroring.childrenInherit: true
+
+                    readonly property real minimumWidth: {
+                        var min = Infinity;
+                        for (var i = 0; i < children.length; i++) {
+                            var c = children[i];
+                            if (c.visible && c.width > 0)
+                                min = Math.min(min, c.width);
+                        }
+                        return min === Infinity ? 0 : min;
+                    }
+                    property int animationsRunning: 0
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionRV.isGroup
+                    onTapped: function(eventPoint) {
+                        var localPos = flowRV.mapFromItem(sectionRV, eventPoint.position.x, eventPoint.position.y);
+                        var child = flowRV.childAt(localPos.x, localPos.y);
+                        if (!child) {
+                            groupedLayout.showSectionMenu(sectionRV, sectionRV.origIndex);
+                        }
+                    }
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    enabled: sectionRV.isSpacer
+                    onTapped: {
+                        groupedLayout.showSpacerMenu(sectionRV, sectionRV.origIndex);
+                    }
+                }
+
+                implicitHeight: isSpacer ? spacerSize : contentHeight
+            }
+        }
     }
 
     function containerForGroup(layoutIndex) {
-        var rep = tasks.vertical ? repeaterV : repeaterH;
-        if (layoutIndex < 0 || layoutIndex >= rep.count) return null;
-        var section = rep.itemAt(layoutIndex);
-        if (!section || !section.isGroup) return null;
-        return section.taskFlow;
+        if (layoutIndex < 0 || layoutIndex >= layoutItems.length) return null;
+        // Search both left and right repeaters
+        var repeaters = tasks.vertical
+            ? [repeaterLeftV, repeaterRightV]
+            : [repeaterLeftH, repeaterRightH];
+        for (var r = 0; r < repeaters.length; r++) {
+            var rep = repeaters[r];
+            for (var g = 0; g < rep.count; g++) {
+                var section = rep.itemAt(g);
+                if (!section) continue;
+                if (section.origIndex === layoutIndex && section.isGroup) {
+                    return section.taskFlow;
+                }
+            }
+        }
+        return null;
     }
 
     readonly property Component sectionMenuComponent: Qt.createComponent("GroupSectionMenu.qml")

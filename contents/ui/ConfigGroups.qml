@@ -586,6 +586,20 @@ KCMUtils.SimpleKCM {
                         handleArea.onCanceled: { content.y = 0; }
 
                         rightControls: [
+                            QQC2.Button {
+                                visible: delegateRoot.isGroup
+                                readonly property bool isRight: (delegateRoot.itemData["float"] || "left") === "right"
+                                text: isRight ? i18n("Right") : i18n("Left")
+                                icon.name: isRight ? "align-horizontal-right" : "align-horizontal-left"
+                                display: QQC2.AbstractButton.TextBesideIcon
+                                QQC2.ToolTip.text: i18n("Float side: click to toggle")
+                                QQC2.ToolTip.visible: hovered
+                                onClicked: {
+                                    var items = root.layoutItems.slice();
+                                    items[delegateRoot.origIndex] = Object.assign({}, items[delegateRoot.origIndex], {"float": isRight ? "left" : "right"});
+                                    root.layoutItems = items;
+                                }
+                            },
                             QQC2.Label {
                                 visible: delegateRoot.isSpacer
                                 text: i18n("Width:")

@@ -60,6 +60,16 @@ PlasmaExtras.Menu {
     }
 
     PlasmaExtras.MenuItem {
+        readonly property bool isRight: (sectionMenu.itemData["float"] || "left") === "right"
+        text: isRight ? i18n("Float Left") : i18n("Float Right")
+        icon: isRight ? "align-horizontal-left" : "align-horizontal-right"
+
+        onClicked: {
+            sectionMenu.tasksRoot.setGroupFloat(sectionMenu.layoutIndex, isRight ? "left" : "right");
+        }
+    }
+
+    PlasmaExtras.MenuItem {
         text: i18n("Remove Group")
         icon: "edit-delete"
         visible: !sectionMenu.isUngrouped

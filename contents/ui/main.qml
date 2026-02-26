@@ -348,6 +348,15 @@ PlasmoidItem {
         }
     }
 
+    function setGroupFloat(layoutIndex, floatValue) {
+        var items = parsedLayout.slice();
+        if (layoutIndex >= 0 && layoutIndex < items.length) {
+            items[layoutIndex] = Object.assign({}, items[layoutIndex]);
+            items[layoutIndex].float = floatValue;
+            _saveLayout(items);
+        }
+    }
+
     function removeLayoutItem(layoutIndex) {
         var items = parsedLayout.slice();
         if (layoutIndex >= 0 && layoutIndex < items.length) {
@@ -376,10 +385,8 @@ PlasmoidItem {
         }
     }
 
-    // groupAlignment 0-2 = fill (Left/Right/Center), 3 = no fill
-    readonly property bool effectiveFill: groupedMode
-        ? Plasmoid.configuration.groupAlignment !== 3
-        : Plasmoid.configuration.fill
+    // In grouped mode, always fill (float handles spacing); otherwise use config
+    readonly property bool effectiveFill: groupedMode ? true : Plasmoid.configuration.fill
     Layout.fillWidth: vertical ? true : effectiveFill
     Layout.fillHeight: !vertical ? true : effectiveFill
     Layout.minimumWidth: {
@@ -870,7 +877,6 @@ PlasmoidItem {
                 id: groupedLayout
                 visible: tasks.groupedMode
                 layoutItems: tasks.parsedLayout
-                alignment: Plasmoid.configuration.groupAlignment
                 anchors {
                     left: parent.left
                     top: parent.top
