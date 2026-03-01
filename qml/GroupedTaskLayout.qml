@@ -162,7 +162,7 @@ Item {
             groupTasks[gIdx].push(task);
         }
 
-        // For each group, sort tasks by appIds order, then reparent in order
+        // For each group, sort tasks by appIds order, then reparent only if needed
         for (var gIdx in groupTasks) {
             var container = containerForGroup(parseInt(gIdx));
             if (!container) continue;
@@ -183,17 +183,37 @@ Item {
                 return oa - ob;
             });
 
-            // Detach all tasks to taskList, then reparent in sorted order.
-            // Flow uses insertion order, so this controls visual ordering.
-            for (var d = 0; d < tasksInGroup.length; d++) {
-                tasksInGroup[d].oldX = -1;
-                tasksInGroup[d].oldY = -1;
-                tasksInGroup[d].parent = tasks.taskList;
+            // Check if all tasks are already in the correct container and order
+            var needsReorder = tasksInGroup.length > 0 && tasksInGroup[0].parent !== container;
+            if (!needsReorder) {
+                // Check if Flow child order matches sorted order
+                var flowIdx = 0;
+                for (var c = 0; c < container.children.length && flowIdx < tasksInGroup.length; c++) {
+                    var child = container.children[c];
+                    if (child && child.appId !== undefined && child.visible) {
+                        if (child !== tasksInGroup[flowIdx]) {
+                            needsReorder = true;
+                            break;
+                        }
+                        flowIdx++;
+                    }
+                }
+                if (flowIdx < tasksInGroup.length) needsReorder = true;
             }
-            for (var r = 0; r < tasksInGroup.length; r++) {
-                tasksInGroup[r].oldX = -1;
-                tasksInGroup[r].oldY = -1;
-                tasksInGroup[r].parent = container;
+
+            if (needsReorder) {
+                // Detach then re-add in sorted order (synchronous = no flash).
+                // Flow uses insertion order, so this controls visual ordering.
+                for (var d = 0; d < tasksInGroup.length; d++) {
+                    tasksInGroup[d].oldX = -1;
+                    tasksInGroup[d].oldY = -1;
+                    tasksInGroup[d].parent = tasks.taskList;
+                }
+                for (var r = 0; r < tasksInGroup.length; r++) {
+                    tasksInGroup[r].oldX = -1;
+                    tasksInGroup[r].oldY = -1;
+                    tasksInGroup[r].parent = container;
+                }
             }
         }
     }
@@ -281,44 +301,27 @@ Item {
         tasks._saveLayout(layoutItems);
     }
 
-    property bool _reparentPending: false
     property bool _dragDirty: false  // true when in-memory appIds changed during drag
 
     onLayoutItemsChanged: {
-        if (!tasks.dragSource) {
-            _returnAllTasksToTaskList();
-            _reparentTimer.restart();
-        } else {
-            // During a drag, defer full reparent until drag ends.
-            _reparentPending = true;
-        }
+        // Qt.callLater runs after all bindings settle (Repeater creates
+        // new containers) but before the next render frame — no flash.
+        Qt.callLater(reparentAllTasks);
     }
 
     Connections {
         target: tasks
         function onDragSourceChanged() {
-            if (!tasks.dragSource) {
-                if (groupedLayout._dragDirty) {
-                    // Persist the in-memory appIds order that was built up during drag
-                    groupedLayout._dragDirty = false;
-                    groupedLayout.persistLayout();
-                }
-                if (groupedLayout._reparentPending) {
-                    groupedLayout._reparentPending = false;
-                    _reparentTimer.restart();
-                }
+            if (!tasks.dragSource && groupedLayout._dragDirty) {
+                // Persist the in-memory appIds order that was built up during drag
+                groupedLayout._dragDirty = false;
+                groupedLayout.persistLayout();
             }
         }
     }
 
-    Timer {
-        id: _reparentTimer
-        interval: 0
-        onTriggered: groupedLayout.reparentAllTasks()
-    }
-
     function scheduleReparent() {
-        _reparentTimer.restart();
+        reparentAllTasks();
     }
 
     // Helper: search a repeater for a task at position

@@ -867,8 +867,8 @@ PlasmoidItem {
                         taskClosedWithMouseMiddleButton = [];
                     }
                     onItemAdded: (index, item) => {
-                        if (tasks.groupedMode) {
-                            groupedLayout.scheduleReparent();
+                        if (tasks.groupedMode && item) {
+                            groupedLayout.reparentTask(item);
                         }
                     }
                 }
