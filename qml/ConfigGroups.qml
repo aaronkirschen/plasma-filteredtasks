@@ -15,14 +15,84 @@ import Qt.labs.settings as LabSettings
 
 import org.kde.kcmutils as KCMUtils
 import org.kde.kirigami as Kirigami
+import QtCore
 
 KCMUtils.SimpleKCM {
     id: root
 
     property string cfg_taskGroups
+    property string cfg_taskGroupsDefault
     property string cfg_filterAppIds
+    property string cfg_filterAppIdsDefault
     property bool cfg_exclusiveMode
+    property bool cfg_exclusiveModeDefault
     property string cfg_syncGroup
+    property string cfg_syncGroupDefault
+    // Stubs for keys managed by other pages
+    property bool cfg_showOnlyCurrentScreen
+    property bool cfg_showOnlyCurrentScreenDefault
+    property bool cfg_showOnlyCurrentDesktop
+    property bool cfg_showOnlyCurrentDesktopDefault
+    property bool cfg_showOnlyCurrentActivity
+    property bool cfg_showOnlyCurrentActivityDefault
+    property bool cfg_showOnlyMinimized
+    property bool cfg_showOnlyMinimizedDefault
+    property bool cfg_unhideOnAttention
+    property bool cfg_unhideOnAttentionDefault
+    property int cfg_groupingStrategy
+    property int cfg_groupingStrategyDefault
+    property int cfg_groupedTaskVisualization
+    property int cfg_groupedTaskVisualizationDefault
+    property bool cfg_groupPopups
+    property bool cfg_groupPopupsDefault
+    property bool cfg_onlyGroupWhenFull
+    property bool cfg_onlyGroupWhenFullDefault
+    property var cfg_groupingAppIdBlacklist
+    property var cfg_groupingAppIdBlacklistDefault
+    property var cfg_groupingLauncherUrlBlacklist
+    property var cfg_groupingLauncherUrlBlacklistDefault
+    property int cfg_sortingStrategy
+    property int cfg_sortingStrategyDefault
+    property bool cfg_separateLaunchers
+    property bool cfg_separateLaunchersDefault
+    property bool cfg_hideLauncherOnStart
+    property bool cfg_hideLauncherOnStartDefault
+    property var cfg_launchers
+    property var cfg_launchersDefault
+    property int cfg_middleClickAction
+    property int cfg_middleClickActionDefault
+    property bool cfg_showToolTips
+    property bool cfg_showToolTipsDefault
+    property bool cfg_highlightWindows
+    property bool cfg_highlightWindowsDefault
+    property bool cfg_indicateAudioStreams
+    property bool cfg_indicateAudioStreamsDefault
+    property bool cfg_interactiveMute
+    property bool cfg_interactiveMuteDefault
+    property bool cfg_tooltipControls
+    property bool cfg_tooltipControlsDefault
+    property bool cfg_fill
+    property bool cfg_fillDefault
+    property int cfg_maxStripes
+    property int cfg_maxStripesDefault
+    property bool cfg_forceStripes
+    property bool cfg_forceStripesDefault
+    property int cfg_taskMaxWidth
+    property int cfg_taskMaxWidthDefault
+    property int cfg_iconSpacing
+    property int cfg_iconSpacingDefault
+    property bool cfg_taskHoverEffect
+    property bool cfg_taskHoverEffectDefault
+    property int cfg_maxTextLines
+    property int cfg_maxTextLinesDefault
+    property bool cfg_minimizeActiveTaskOnClick
+    property bool cfg_minimizeActiveTaskOnClickDefault
+    property bool cfg_reverseMode
+    property bool cfg_reverseModeDefault
+    property int cfg_wheelEnabled
+    property int cfg_wheelEnabledDefault
+    property bool cfg_wheelSkipMinimized
+    property bool cfg_wheelSkipMinimizedDefault
 
     property var layoutItems: []
     property bool _loading: true
@@ -104,11 +174,7 @@ KCMUtils.SimpleKCM {
     property bool appsLoaded: false
     ListModel { id: allAppsModel }
 
-    readonly property string homeDir: {
-        var url = Qt.resolvedUrl(".").toString();
-        var m = url.match(/^file:\/\/(\/[^\/]+\/[^\/]+)\//);
-        return m ? m[1] : "";
-    }
+    readonly property string homeDir: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
 
     FolderListModel {
         id: systemApps
@@ -228,8 +294,6 @@ KCMUtils.SimpleKCM {
     }
 
     function _refreshSyncGroups() {
-        // Read from file (works cross-process, so config dialog can see names
-        // registered by running plasmashell widgets)
         if (!_syncNamesPath) { _knownSyncGroups = []; return; }
         syncNamesStore.sync();
         var names = String(syncNamesStore.value("names", ""));

@@ -13,7 +13,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasmoid
 
-import "code/layoutmetrics.js" as LayoutMetrics
+import "layoutmetrics.js" as LayoutMetrics
 
 PlasmaCore.PopupPlasmaWindow {
     id: groupDialog

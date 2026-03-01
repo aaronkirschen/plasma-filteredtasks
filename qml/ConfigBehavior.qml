@@ -19,22 +19,78 @@ import org.kde.taskmanager as TaskManager
 
 KCMUtils.SimpleKCM {
     property alias cfg_groupingStrategy: groupingStrategy.currentIndex
+    property int cfg_groupingStrategyDefault
     property alias cfg_groupedTaskVisualization: groupedTaskVisualization.currentIndex
+    property int cfg_groupedTaskVisualizationDefault
     property alias cfg_groupPopups: groupPopups.checked
+    property bool cfg_groupPopupsDefault
     property alias cfg_onlyGroupWhenFull: onlyGroupWhenFull.checked
+    property bool cfg_onlyGroupWhenFullDefault
+    property var cfg_groupingAppIdBlacklist
+    property var cfg_groupingAppIdBlacklistDefault
+    property var cfg_groupingLauncherUrlBlacklist
+    property var cfg_groupingLauncherUrlBlacklistDefault
     property int cfg_sortingStrategy
+    property int cfg_sortingStrategyDefault
     property alias cfg_separateLaunchers: separateLaunchers.checked
+    property bool cfg_separateLaunchersDefault
     property alias cfg_hideLauncherOnStart: hideLauncherOnStart.checked
+    property bool cfg_hideLauncherOnStartDefault
     property alias cfg_middleClickAction: middleClickAction.currentIndex
+    property int cfg_middleClickActionDefault
     property alias cfg_wheelEnabled: wheelEnabled.currentIndex
+    property int cfg_wheelEnabledDefault
     property alias cfg_wheelSkipMinimized: wheelSkipMinimized.checked
+    property bool cfg_wheelSkipMinimizedDefault
     property alias cfg_showOnlyCurrentScreen: showOnlyCurrentScreen.checked
+    property bool cfg_showOnlyCurrentScreenDefault
     property alias cfg_showOnlyCurrentDesktop: showOnlyCurrentDesktop.checked
+    property bool cfg_showOnlyCurrentDesktopDefault
     property alias cfg_showOnlyCurrentActivity: showOnlyCurrentActivity.checked
+    property bool cfg_showOnlyCurrentActivityDefault
     property alias cfg_showOnlyMinimized: showOnlyMinimized.checked
+    property bool cfg_showOnlyMinimizedDefault
     property alias cfg_minimizeActiveTaskOnClick: minimizeActive.checked
+    property bool cfg_minimizeActiveTaskOnClickDefault
     property alias cfg_unhideOnAttention: unhideOnAttention.checked
+    property bool cfg_unhideOnAttentionDefault
     property alias cfg_reverseMode: reverseMode.checked
+    property bool cfg_reverseModeDefault
+    // Stubs for keys managed by other pages
+    property bool cfg_showToolTips
+    property bool cfg_showToolTipsDefault
+    property bool cfg_highlightWindows
+    property bool cfg_highlightWindowsDefault
+    property bool cfg_indicateAudioStreams
+    property bool cfg_indicateAudioStreamsDefault
+    property bool cfg_interactiveMute
+    property bool cfg_interactiveMuteDefault
+    property bool cfg_tooltipControls
+    property bool cfg_tooltipControlsDefault
+    property bool cfg_fill
+    property bool cfg_fillDefault
+    property int cfg_maxStripes
+    property int cfg_maxStripesDefault
+    property bool cfg_forceStripes
+    property bool cfg_forceStripesDefault
+    property int cfg_taskMaxWidth
+    property int cfg_taskMaxWidthDefault
+    property int cfg_iconSpacing
+    property int cfg_iconSpacingDefault
+    property var cfg_launchers
+    property var cfg_launchersDefault
+    property bool cfg_taskHoverEffect
+    property bool cfg_taskHoverEffectDefault
+    property int cfg_maxTextLines
+    property int cfg_maxTextLinesDefault
+    property string cfg_filterAppIds
+    property string cfg_filterAppIdsDefault
+    property string cfg_taskGroups
+    property string cfg_taskGroupsDefault
+    property bool cfg_exclusiveMode
+    property bool cfg_exclusiveModeDefault
+    property string cfg_syncGroup
+    property string cfg_syncGroupDefault
 
     headerPaddingEnabled: false
     header: ColumnLayout {

@@ -9,7 +9,7 @@ import QtQuick
 import org.kde.taskmanager as TaskManager
 import org.kde.plasma.plasmoid
 
-import "code/tools.js" as TaskTools
+import "tools.js" as TaskTools
 
 DropArea {
     id: dropArea

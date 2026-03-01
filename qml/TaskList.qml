@@ -7,7 +7,7 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
-import "code/layoutmetrics.js" as LayoutMetrics
+import "layoutmetrics.js" as LayoutMetrics
 
 GridLayout {
     property bool animating: false

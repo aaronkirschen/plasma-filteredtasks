@@ -16,11 +16,11 @@ import org.kde.ksvg as KSvg
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.private.taskmanager as TaskManagerApplet
+import plasma.applet.org.kde.plasma.filteredtasks as TaskManagerApplet
 import org.kde.plasma.plasmoid
 
-import "code/layoutmetrics.js" as LayoutMetrics
-import "code/tools.js" as TaskTools
+import "layoutmetrics.js" as LayoutMetrics
+import "tools.js" as TaskTools
 
 PlasmaCore.ToolTipArea {
     id: task
@@ -265,7 +265,7 @@ PlasmaCore.ToolTipArea {
 
     onSmartLauncherEnabledChanged: {
         if (smartLauncherEnabled && !smartLauncherItem) {
-            const component = Qt.createComponent("org.kde.plasma.private.taskmanager", "SmartLauncherItem");
+            const component = Qt.createComponent("plasma.applet.org.kde.plasma.filteredtasks", "SmartLauncherItem");
             const smartLauncher = component.createObject(task);
             component.destroy();
 

@@ -10,7 +10,7 @@ import QtQuick.Templates as T
 import org.kde.ksvg as KSvg
 import org.kde.plasma.plasmoid
 
-import "code/tools.js" as TaskTools
+import "tools.js" as TaskTools
 
 T.ProgressBar {
     id: control

@@ -8,6 +8,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Qt.labs.settings as LabSettings
+import QtCore
 
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents3
@@ -19,11 +20,11 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.workspace.trianglemousefilter
 
 import org.kde.taskmanager as TaskManager
-import org.kde.plasma.private.taskmanager as TaskManagerApplet
+import plasma.applet.org.kde.plasma.filteredtasks as TaskManagerApplet
 import org.kde.plasma.workspace.dbus as DBus
 
-import "code/layoutmetrics.js" as LayoutMetrics
-import "code/tools.js" as TaskTools
+import "layoutmetrics.js" as LayoutMetrics
+import "tools.js" as TaskTools
 
 PlasmoidItem {
     id: tasks
@@ -76,11 +77,7 @@ PlasmoidItem {
     }
 
     // ── Exclusive mode ──
-    readonly property string _homeDir: {
-        var url = Qt.resolvedUrl(".").toString();
-        var m = url.match(/^file:\/\/(\/[^\/]+\/[^\/]+)\//);
-        return m ? m[1] : "";
-    }
+    readonly property string _homeDir: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string _claimsPath: _homeDir !== ""
         ? (_homeDir + "/.config/plasma-filteredtasks-claims.conf") : ""
     readonly property string _myInstanceId: String(Plasmoid.id)
@@ -240,6 +237,10 @@ PlasmoidItem {
     Connections {
         target: Plasmoid.configuration
         function onSyncGroupChanged() { tasks._joinSyncGroup(); }
+        function onExclusiveModeChanged() {
+            tasks._readOtherClaims();
+            if (tasks.groupedMode) groupedLayout.reparentAllTasks();
+        }
         function onTaskGroupsChanged() {
             // Pick up external config changes (e.g. from config dialog Apply).
             // If _saveLayout or _onSyncLayoutChanged already set _liveLayoutJson

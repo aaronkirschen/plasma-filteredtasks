@@ -20,15 +20,78 @@ KCMUtils.SimpleKCM {
     readonly property bool iconOnly: Plasmoid.pluginName === "org.kde.plasma.icontasks" || Plasmoid.pluginName === "org.kde.plasma.filteredtasks"
 
     property alias cfg_showToolTips: showToolTips.checked
+    property bool cfg_showToolTipsDefault
     property alias cfg_highlightWindows: highlightWindows.checked
+    property bool cfg_highlightWindowsDefault
     property bool cfg_indicateAudioStreams
+    property bool cfg_indicateAudioStreamsDefault
     property bool cfg_interactiveMute
+    property bool cfg_interactiveMuteDefault
     property bool cfg_tooltipControls
+    property bool cfg_tooltipControlsDefault
     property alias cfg_fill: fill.checked
+    property bool cfg_fillDefault
     property alias cfg_maxStripes: maxStripes.value
+    property int cfg_maxStripesDefault
     property alias cfg_forceStripes: forceStripes.checked
+    property bool cfg_forceStripesDefault
     property alias cfg_taskMaxWidth: taskMaxWidth.currentIndex
+    property int cfg_taskMaxWidthDefault
     property int cfg_iconSpacing: 0
+    property int cfg_iconSpacingDefault
+    // Stubs for keys managed by other pages
+    property bool cfg_showOnlyCurrentScreen
+    property bool cfg_showOnlyCurrentScreenDefault
+    property bool cfg_showOnlyCurrentDesktop
+    property bool cfg_showOnlyCurrentDesktopDefault
+    property bool cfg_showOnlyCurrentActivity
+    property bool cfg_showOnlyCurrentActivityDefault
+    property bool cfg_showOnlyMinimized
+    property bool cfg_showOnlyMinimizedDefault
+    property bool cfg_unhideOnAttention
+    property bool cfg_unhideOnAttentionDefault
+    property int cfg_groupingStrategy
+    property int cfg_groupingStrategyDefault
+    property int cfg_groupedTaskVisualization
+    property int cfg_groupedTaskVisualizationDefault
+    property bool cfg_groupPopups
+    property bool cfg_groupPopupsDefault
+    property bool cfg_onlyGroupWhenFull
+    property bool cfg_onlyGroupWhenFullDefault
+    property var cfg_groupingAppIdBlacklist
+    property var cfg_groupingAppIdBlacklistDefault
+    property var cfg_groupingLauncherUrlBlacklist
+    property var cfg_groupingLauncherUrlBlacklistDefault
+    property int cfg_sortingStrategy
+    property int cfg_sortingStrategyDefault
+    property bool cfg_separateLaunchers
+    property bool cfg_separateLaunchersDefault
+    property bool cfg_hideLauncherOnStart
+    property bool cfg_hideLauncherOnStartDefault
+    property var cfg_launchers
+    property var cfg_launchersDefault
+    property int cfg_middleClickAction
+    property int cfg_middleClickActionDefault
+    property bool cfg_taskHoverEffect
+    property bool cfg_taskHoverEffectDefault
+    property int cfg_maxTextLines
+    property int cfg_maxTextLinesDefault
+    property bool cfg_minimizeActiveTaskOnClick
+    property bool cfg_minimizeActiveTaskOnClickDefault
+    property bool cfg_reverseMode
+    property bool cfg_reverseModeDefault
+    property int cfg_wheelEnabled
+    property int cfg_wheelEnabledDefault
+    property bool cfg_wheelSkipMinimized
+    property bool cfg_wheelSkipMinimizedDefault
+    property string cfg_filterAppIds
+    property string cfg_filterAppIdsDefault
+    property string cfg_taskGroups
+    property string cfg_taskGroupsDefault
+    property bool cfg_exclusiveMode
+    property bool cfg_exclusiveModeDefault
+    property string cfg_syncGroup
+    property string cfg_syncGroupDefault
 
     Component.onCompleted: {
         /* Don't rely on bindings for checking the radiobuttons
