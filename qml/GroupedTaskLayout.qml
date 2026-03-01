@@ -16,6 +16,7 @@ Item {
     property var layoutItems: []
     property bool animating: false
     property int dropTargetGroupIndex: -1
+    property int dropInsertIndex: -1
 
     // Split layoutItems into left-floated and right-floated arrays.
     // Each entry is {origIndex, data} so delegates can map back to layoutItems.
@@ -232,20 +233,20 @@ Item {
         return -1;
     }
 
-    // Move an app to a specific visual position within a group's appIds.
+    // Move an app to the position of another app within a group's appIds.
     // Updates layoutItems in-place for immediate visual effect without
     // triggering the full _saveLayout → config persistence chain.
     // Returns true if a change was made.
-    function moveAppIdToPosition(groupIdx, appId, targetVisualIndex) {
+    function moveAppIdToPosition(groupIdx, appId, targetAppId) {
         var itemData = layoutItems[groupIdx];
         if (!itemData) return false;
         var ids = itemData.appIds || [];
         var fromIdx = ids.indexOf(appId);
-        if (fromIdx < 0 || targetVisualIndex < 0 || targetVisualIndex >= ids.length) return false;
-        if (fromIdx === targetVisualIndex) return false;
+        var toIdx = ids.indexOf(targetAppId);
+        if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return false;
         // Mutate in place for speed — we'll persist on drop
         ids.splice(fromIdx, 1);
-        ids.splice(targetVisualIndex, 0, appId);
+        ids.splice(toIdx, 0, appId);
         _dragDirty = true;
         return true;
     }
@@ -316,6 +317,10 @@ Item {
                 // Persist the in-memory appIds order that was built up during drag
                 groupedLayout._dragDirty = false;
                 groupedLayout.persistLayout();
+            }
+            if (!tasks.dragSource) {
+                groupedLayout.dropInsertIndex = -1;
+                dropIndicator.visible = false;
             }
         }
     }
@@ -808,5 +813,58 @@ Item {
             visualParent: section
         });
         menu.openRelative();
+    }
+
+    // ── Drop position indicator ──
+
+    function updateDropIndicator() {
+        if (dropTargetGroupIndex < 0 || dropInsertIndex < 0 || !tasks.dragSource) {
+            dropIndicator.visible = false;
+            return;
+        }
+        var container = containerForGroup(dropTargetGroupIndex);
+        if (!container) { dropIndicator.visible = false; return; }
+
+        var isVert = tasks.vertical;
+        var visibleTasks = [];
+        for (var c = 0; c < container.children.length; c++) {
+            var child = container.children[c];
+            if (child && child.visible && child.appId !== undefined)
+                visibleTasks.push(child);
+        }
+        if (visibleTasks.length === 0) { dropIndicator.visible = false; return; }
+
+        var targetTask, pos;
+        if (dropInsertIndex < visibleTasks.length) {
+            targetTask = visibleTasks[dropInsertIndex];
+            pos = targetTask.mapToItem(groupedLayout, 0, 0);
+        } else {
+            // After the last task
+            targetTask = visibleTasks[visibleTasks.length - 1];
+            pos = targetTask.mapToItem(groupedLayout,
+                isVert ? 0 : targetTask.width,
+                isVert ? targetTask.height : 0);
+        }
+
+        if (isVert) {
+            dropIndicator.x = pos.x;
+            dropIndicator.y = pos.y - 1;
+            dropIndicator.width = targetTask.width;
+            dropIndicator.height = 3;
+        } else {
+            dropIndicator.x = pos.x - 1;
+            dropIndicator.y = pos.y;
+            dropIndicator.width = 3;
+            dropIndicator.height = targetTask.height;
+        }
+        dropIndicator.visible = true;
+    }
+
+    Rectangle {
+        id: dropIndicator
+        visible: false
+        color: Kirigami.Theme.highlightColor
+        radius: 1
+        z: 1000
     }
 }

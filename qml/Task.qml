@@ -82,6 +82,8 @@ PlasmaCore.ToolTipArea {
         return false;
     }
     visible: passesFilter
+    opacity: (tasksRoot.dragSource === task) ? 0.4 : 1.0
+    Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
     readonly property bool isIcon: tasksRoot.iconsOnly || model.IsLauncher
     property bool toolTipOpen: false
     property bool inPopup: false

@@ -20,6 +20,8 @@ DropArea {
     property Item hoveredItem
     property bool isGroupDialog: false
     property bool moved: false
+    property point dragStartPos: Qt.point(-1, -1)
+    property bool dragMovedPastThreshold: false
 
     property alias handleWheelEvents: wheelHandler.handleWheelEvents
 
@@ -31,11 +33,23 @@ DropArea {
         if (target.animating) { // Not all targets have an animating property
             target.animating = false;
         }
+        dragStartPos = Qt.point(event.x, event.y);
+        dragMovedPastThreshold = false;
     }
 
     onPositionChanged: event => {
         if (target.animating) {
             return;
+        }
+
+        // Skip reorder logic until cursor has moved a minimum distance from drag start
+        if (tasks.groupedMode && tasks.dragSource && !dragMovedPastThreshold) {
+            var dx = event.x - dragStartPos.x;
+            var dy = event.y - dragStartPos.y;
+            if (dx * dx + dy * dy < 25) { // 5px threshold
+                return;
+            }
+            dragMovedPastThreshold = true;
         }
 
         let above;
@@ -53,6 +67,8 @@ DropArea {
                 var mappedPos = tasks.groupedLayout.mapFromItem(dropArea, event.x, event.y);
                 var targetIdx = tasks.groupedLayout.groupIndexAtPosition(mappedPos.x, mappedPos.y);
                 tasks.groupedLayout.dropTargetGroupIndex = targetIdx;
+                tasks.groupedLayout.dropInsertIndex = -1;
+                tasks.groupedLayout.updateDropIndicator();
                 if (targetIdx >= 0 && tasks.dragSource.groupIndex >= 0
                     && tasks.dragSource.groupIndex !== targetIdx) {
                     tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, targetIdx);
@@ -97,16 +113,22 @@ DropArea {
                         && above.groupIndex >= 0 && tasks.dragSource.groupIndex !== above.groupIndex) {
                         tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, above.groupIndex);
                     }
+                    tasks.groupedLayout.dropInsertIndex = -1;
+                    tasks.groupedLayout.updateDropIndicator();
                     return;
                 }
 
                 // Same-group drag: compare visual positions within the Flow
                 if (tasks.dragSource !== above) {
-                    var targetVisual = tasks.groupedLayout.visualIndexInFlow(above);
-                    if (targetVisual >= 0 && tasks.groupedLayout.moveAppIdToPosition(
-                            tasks.dragSource.groupIndex, tasks.dragSource.appId, targetVisual)) {
+                    tasks.groupedLayout.dropInsertIndex = tasks.groupedLayout.visualIndexInFlow(above);
+                    if (tasks.groupedLayout.moveAppIdToPosition(
+                            tasks.dragSource.groupIndex, tasks.dragSource.appId, above.appId)) {
                         tasks.groupedLayout.reorderGroupFlow(tasks.dragSource.groupIndex);
                     }
+                    tasks.groupedLayout.updateDropIndicator();
+                } else {
+                    tasks.groupedLayout.dropInsertIndex = tasks.groupedLayout.visualIndexInFlow(above);
+                    tasks.groupedLayout.updateDropIndicator();
                 }
             } else {
                 // ── Non-grouped mode drag: use model index ──
@@ -141,12 +163,16 @@ DropArea {
         activationTimer.stop();
         if (tasks.groupedMode) {
             tasks.groupedLayout.dropTargetGroupIndex = -1;
+            tasks.groupedLayout.dropInsertIndex = -1;
+            tasks.groupedLayout.updateDropIndicator();
         }
     }
 
     onDropped: event => {
         if (tasks.groupedMode) {
             tasks.groupedLayout.dropTargetGroupIndex = -1;
+            tasks.groupedLayout.dropInsertIndex = -1;
+            tasks.groupedLayout.updateDropIndicator();
         }
         // Reject internal drops.
         if (event.formats.indexOf("application/x-orgkdeplasmataskmanager_taskbuttonitem") >= 0) {
@@ -173,6 +199,8 @@ DropArea {
             if (!dragSource) {
                 ignoredItem = null;
                 ignoreItemTimer.stop();
+                dragMovedPastThreshold = false;
+                dragStartPos = Qt.point(-1, -1);
             }
         }
     }
