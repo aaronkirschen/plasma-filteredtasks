@@ -66,21 +66,9 @@ PlasmaCore.ToolTipArea {
     readonly property string appId: model.AppId.replace(/\.desktop/, '')
     property int groupIndex: -1
 
-    // Flat filter for non-grouped mode; grouped mode controls visibility via reparenting
-    readonly property var allowedApps: {
-        if (tasksRoot.groupedMode) return [];
-        var raw = Plasmoid.configuration.filterAppIds;
-        if (!raw || raw.trim() === "") return [];
-        return raw.split(",").map(function(s) { return s.trim(); });
-    }
-    readonly property bool passesFilter: {
-        if (tasksRoot.groupedMode) return true;
-        if (allowedApps.length === 0) return true;
-        for (var i = 0; i < allowedApps.length; i++) {
-            if (allowedApps[i] === appId) return true;
-        }
-        return false;
-    }
+    // In grouped mode, visibility is controlled via reparenting in GroupedTaskLayout.
+    // In non-grouped mode (no taskGroups configured), all tasks are visible.
+    readonly property bool passesFilter: true
     visible: passesFilter
     opacity: (tasksRoot.dragSource === task) ? 0.4 : 1.0
     Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
