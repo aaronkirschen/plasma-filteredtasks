@@ -951,20 +951,9 @@ PlasmoidItem {
         // Initialize layout if no groups are configured yet
         var tg = Plasmoid.configuration.taskGroups;
         if (!tg || tg.trim() === "" || tg.trim() === "[]") {
-            var fa = Plasmoid.configuration.filterAppIds;
-            if (fa && fa.trim() !== "") {
-                // Migrate from flat filter list to grouped layout
-                var ids = fa.split(",").map(function(s) { return s.trim(); }).filter(function(s) { return s !== ""; });
-                Plasmoid.configuration.taskGroups = JSON.stringify([
-                    {type: "group", name: "Default", appIds: ids, color: ""},
-                    {type: "spacer", width: 8},
-                    {type: "group", name: "__ungrouped", appIds: [], color: ""}
-                ]);
-            } else {
-                Plasmoid.configuration.taskGroups = JSON.stringify([
-                    {type: "group", name: "__ungrouped", appIds: [], color: ""}
-                ]);
-            }
+            Plasmoid.configuration.taskGroups = JSON.stringify([
+                {type: "group", name: "__ungrouped", appIds: [], color: ""}
+            ]);
         }
 
         // Set initial live state and join sync group
