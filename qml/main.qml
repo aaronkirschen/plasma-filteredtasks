@@ -51,6 +51,9 @@ PlasmoidItem {
     // used to avoid feedback loops (same pattern as _liveLayoutJson).
     property string _liveLaunchersJson: ""
 
+    // Live grouping blacklist JSON — tracks which apps have grouping disabled, synced like launchers.
+    property string _liveGroupingBlacklistJson: ""
+
     // Parsed layout: mixed array of group and spacer items from config
     readonly property var parsedLayout: {
         var raw = _liveLayoutJson;
@@ -197,11 +200,13 @@ PlasmoidItem {
             _liveLayoutJson = Plasmoid.configuration.taskGroups;
             return;
         }
-        // Join the group; returns existing layout and launchers if another widget is already in it
+        // Join the group; returns existing layout, launchers, and grouping blacklist if another widget is already in it
         var localLaunchers = JSON.stringify(Plasmoid.configuration.launchers);
+        var localBlacklist = _serializeGroupingBlacklist();
         var result = TaskTools.joinSyncGroup(name, _syncInstanceId,
             _onSyncLayoutChanged, Plasmoid.configuration.taskGroups,
-            _onSyncLaunchersChanged, localLaunchers);
+            _onSyncLaunchersChanged, localLaunchers,
+            _onSyncGroupingBlacklistChanged, localBlacklist);
         // Adopt layout
         if (result.layout && result.layout !== "") {
             _liveLayoutJson = result.layout;
@@ -218,6 +223,13 @@ PlasmoidItem {
         } else {
             _liveLaunchersJson = localLaunchers;
         }
+        // Adopt grouping blacklist
+        if (result.groupingBlacklist && result.groupingBlacklist !== "") {
+            _liveGroupingBlacklistJson = result.groupingBlacklist;
+            _applyGroupingBlacklist(result.groupingBlacklist);
+        } else {
+            _liveGroupingBlacklistJson = localBlacklist;
+        }
         // Register name to file so config dialogs can discover it
         _registerSyncGroupName(name);
     }
@@ -232,6 +244,34 @@ PlasmoidItem {
         var launcherList = JSON.parse(newLaunchersJson);
         tasksModel.launcherList = launcherList;
         Plasmoid.configuration.launchers = launcherList;
+    }
+
+    function _serializeGroupingBlacklist() {
+        return JSON.stringify({
+            appIds: Array.from(Plasmoid.configuration.groupingAppIdBlacklist),
+            launcherUrls: Array.from(Plasmoid.configuration.groupingLauncherUrlBlacklist)
+        });
+    }
+
+    function _applyGroupingBlacklist(json) {
+        var data = JSON.parse(json);
+        tasksModel.groupingAppIdBlacklist = data.appIds;
+        tasksModel.groupingLauncherUrlBlacklist = data.launcherUrls;
+        Plasmoid.configuration.groupingAppIdBlacklist = data.appIds;
+        Plasmoid.configuration.groupingLauncherUrlBlacklist = data.launcherUrls;
+    }
+
+    function _onSyncGroupingBlacklistChanged(newJson) {
+        _liveGroupingBlacklistJson = newJson;
+        _applyGroupingBlacklist(newJson);
+    }
+
+    function _broadcastGroupingBlacklist() {
+        if (!_activeSyncGroup) return;
+        var json = _serializeGroupingBlacklist();
+        if (json === _liveGroupingBlacklistJson) return;
+        _liveGroupingBlacklistJson = json;
+        TaskTools.updateSyncGroupGroupingBlacklist(_activeSyncGroup, json, _syncInstanceId);
     }
 
     Connections {
@@ -539,10 +579,12 @@ PlasmoidItem {
 
         onGroupingAppIdBlacklistChanged: {
             Plasmoid.configuration.groupingAppIdBlacklist = groupingAppIdBlacklist;
+            tasks._broadcastGroupingBlacklist();
         }
 
         onGroupingLauncherUrlBlacklistChanged: {
             Plasmoid.configuration.groupingLauncherUrlBlacklist = groupingLauncherUrlBlacklist;
+            tasks._broadcastGroupingBlacklist();
         }
 
         function sortModeEnumValue(index: int): /*TaskManager.TasksModel.SortMode*/ int {
@@ -910,11 +952,7 @@ PlasmoidItem {
     }
 
     // This is called by plasmashell in response to a Meta+number shortcut.
-    // TODO: Change type to int
-    function activateTaskAtIndex(index: var): void {
-        if (typeof index !== "number") {
-            return;
-        }
+    function activateTaskAtIndex(index: int): void {
 
         const task = taskRepeater.itemAt(index);
         if (task) {

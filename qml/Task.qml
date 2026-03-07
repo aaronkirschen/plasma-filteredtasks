@@ -32,30 +32,22 @@ PlasmaCore.ToolTipArea {
     // so un-rotate them here to fix that.
     rotation: Plasmoid.configuration.reverseMode && Plasmoid.formFactor === PlasmaCore.Types.Vertical ? 180 : 0
 
-    implicitHeight: passesFilter
-        ? (inPopup
-            ? LayoutMetrics.preferredHeightInPopup()
-            : (tasksRoot.vertical && tasksRoot.groupedMode
-                ? LayoutMetrics.preferredMaxHeight()
-                : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
-                         LayoutMetrics.preferredMinHeight())))
-        : 0
-    implicitWidth: passesFilter
-        ? (tasksRoot.vertical
-            ? Math.max(LayoutMetrics.preferredMinWidth(), Math.min(LayoutMetrics.preferredMaxWidth(), tasksRoot.width / tasksRoot.plasmoid.configuration.maxStripes))
-            : (tasksRoot.groupedMode ? LayoutMetrics.preferredMaxWidth() : 0))
-        : 0
+    implicitHeight: inPopup
+        ? LayoutMetrics.preferredHeightInPopup()
+        : (tasksRoot.vertical && tasksRoot.groupedMode
+            ? LayoutMetrics.preferredMaxHeight()
+            : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
+                     LayoutMetrics.preferredMinHeight()))
+    implicitWidth: tasksRoot.vertical
+        ? Math.max(LayoutMetrics.preferredMinWidth(), Math.min(LayoutMetrics.preferredMaxWidth(), tasksRoot.width / tasksRoot.plasmoid.configuration.maxStripes))
+        : (tasksRoot.groupedMode ? LayoutMetrics.preferredMaxWidth() : 0)
 
-    Layout.fillWidth: passesFilter
-    Layout.fillHeight: passesFilter && !inPopup
-    Layout.maximumWidth: passesFilter
-        ? (tasksRoot.vertical
-            ? -1
-            : ((model.IsLauncher && !tasks.iconsOnly) ? tasksRoot.height / taskList.rows : LayoutMetrics.preferredMaxWidth()))
-        : 0
-    Layout.maximumHeight: passesFilter
-        ? (tasksRoot.vertical ? LayoutMetrics.preferredMaxHeight() : -1)
-        : 0
+    Layout.fillWidth: true
+    Layout.fillHeight: !inPopup
+    Layout.maximumWidth: tasksRoot.vertical
+        ? -1
+        : ((model.IsLauncher && !tasks.iconsOnly) ? tasksRoot.height / taskList.rows : LayoutMetrics.preferredMaxWidth())
+    Layout.maximumHeight: tasksRoot.vertical ? LayoutMetrics.preferredMaxHeight() : -1
 
     required property var model
     required property int index
@@ -66,10 +58,6 @@ PlasmaCore.ToolTipArea {
     readonly property string appId: model.AppId.replace(/\.desktop/, '')
     property int groupIndex: -1
 
-    // In grouped mode, visibility is controlled via reparenting in GroupedTaskLayout.
-    // In non-grouped mode (no taskGroups configured), all tasks are visible.
-    readonly property bool passesFilter: true
-    visible: passesFilter
     opacity: (tasksRoot.dragSource === task) ? 0.4 : 1.0
     Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
     readonly property bool isIcon: tasksRoot.iconsOnly || model.IsLauncher

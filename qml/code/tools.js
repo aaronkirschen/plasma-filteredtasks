@@ -16,7 +16,7 @@ var taskManagerInstanceCount = 0;
 
 // ── Sync group registry (single source of truth) ──
 // Shared across all plasmoid instances via .pragma library.
-// Key = group name, Value = {layoutJson, launchersJson, subscribers: [{id, onLayoutChanged, onLaunchersChanged}]}
+// Key = group name, Value = {layoutJson, launchersJson, groupingBlacklistJson, subscribers: [{id, onLayoutChanged, onLaunchersChanged, onGroupingBlacklistChanged}]}
 var _syncGroups = {};
 var _syncGroupChangeListeners = [];
 
@@ -34,20 +34,25 @@ function getSyncGroupLaunchers(name) {
     return _syncGroups[name].launchersJson;
 }
 
-// Join a sync group. Returns {layout, launchers} with existing data, or null values if new group.
-function joinSyncGroup(name, instanceId, layoutCallback, initialLayoutJson, launcherCallback, initialLaunchersJson) {
-    if (!name) return {layout: null, launchers: null};
+function getSyncGroupGroupingBlacklist(name) {
+    if (!name || !_syncGroups[name]) return null;
+    return _syncGroups[name].groupingBlacklistJson;
+}
+
+// Join a sync group. Returns {layout, launchers, groupingBlacklist} with existing data, or null values if new group.
+function joinSyncGroup(name, instanceId, layoutCallback, initialLayoutJson, launcherCallback, initialLaunchersJson, groupingBlacklistCallback, initialGroupingBlacklistJson) {
+    if (!name) return {layout: null, launchers: null, groupingBlacklist: null};
     if (!_syncGroups[name]) {
-        _syncGroups[name] = {layoutJson: initialLayoutJson || "", launchersJson: initialLaunchersJson || "", subscribers: []};
+        _syncGroups[name] = {layoutJson: initialLayoutJson || "", launchersJson: initialLaunchersJson || "", groupingBlacklistJson: initialGroupingBlacklistJson || "", subscribers: []};
     }
     var group = _syncGroups[name];
     // Avoid duplicate subscription
     for (var i = 0; i < group.subscribers.length; i++) {
-        if (group.subscribers[i].id === instanceId) return {layout: group.layoutJson, launchers: group.launchersJson};
+        if (group.subscribers[i].id === instanceId) return {layout: group.layoutJson, launchers: group.launchersJson, groupingBlacklist: group.groupingBlacklistJson};
     }
-    group.subscribers.push({id: instanceId, onLayoutChanged: layoutCallback, onLaunchersChanged: launcherCallback});
+    group.subscribers.push({id: instanceId, onLayoutChanged: layoutCallback, onLaunchersChanged: launcherCallback, onGroupingBlacklistChanged: groupingBlacklistCallback});
     _notifySyncGroupChange();
-    return {layout: group.layoutJson, launchers: group.launchersJson};
+    return {layout: group.layoutJson, launchers: group.launchersJson, groupingBlacklist: group.groupingBlacklistJson};
 }
 
 function leaveSyncGroup(name, instanceId) {
@@ -80,6 +85,18 @@ function updateSyncGroupLaunchers(name, newLaunchersJson, senderId) {
     for (var i = 0; i < subs.length; i++) {
         if (subs[i].id !== senderId) {
             subs[i].onLaunchersChanged(newLaunchersJson);
+        }
+    }
+}
+
+// Update grouping blacklist and broadcast to all subscribers except the sender.
+function updateSyncGroupGroupingBlacklist(name, newJson, senderId) {
+    if (!name || !_syncGroups[name]) return;
+    _syncGroups[name].groupingBlacklistJson = newJson;
+    var subs = _syncGroups[name].subscribers;
+    for (var i = 0; i < subs.length; i++) {
+        if (subs[i].id !== senderId) {
+            subs[i].onGroupingBlacklistChanged(newJson);
         }
     }
 }
