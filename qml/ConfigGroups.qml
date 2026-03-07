@@ -22,8 +22,6 @@ KCMUtils.SimpleKCM {
 
     property string cfg_taskGroups
     property string cfg_taskGroupsDefault
-    property string cfg_filterAppIds
-    property string cfg_filterAppIdsDefault
     property bool cfg_exclusiveMode
     property bool cfg_exclusiveModeDefault
     property string cfg_syncGroup
@@ -125,16 +123,6 @@ KCMUtils.SimpleKCM {
     onLayoutItemsChanged: {
         if (_loading) return;
         cfg_taskGroups = JSON.stringify(layoutItems);
-        var allIds = [];
-        for (var i = 0; i < layoutItems.length; i++) {
-            var item = layoutItems[i];
-            if (item.type !== "group" || item.name === "__ungrouped") continue;
-            var ids = item.appIds || [];
-            for (var j = 0; j < ids.length; j++) {
-                if (allIds.indexOf(ids[j]) < 0) allIds.push(ids[j]);
-            }
-        }
-        cfg_filterAppIds = allIds.join(",");
         rebuildLayoutModel();
     }
 

@@ -84,8 +84,6 @@ KCMUtils.SimpleKCM {
     property int cfg_wheelEnabledDefault
     property bool cfg_wheelSkipMinimized
     property bool cfg_wheelSkipMinimizedDefault
-    property string cfg_filterAppIds
-    property string cfg_filterAppIdsDefault
     property string cfg_taskGroups
     property string cfg_taskGroupsDefault
     property bool cfg_exclusiveMode
