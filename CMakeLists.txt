@@ -35,7 +35,6 @@ plasma_add_applet(org.kde.plasma.filteredtasks
         qml/config.qml
         qml/ConfigAppearance.qml
         qml/ConfigBehavior.qml
-        qml/ConfigFilter.qml
         qml/ConfigGroups.qml
         qml/ContextMenu.qml
         qml/GroupDialog.qml
