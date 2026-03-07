@@ -26,10 +26,23 @@ This widget is a fork of the stock KDE Plasma Icons-Only Task Manager.
 
 ## Installation
 
+### Build from source
+
+Requires KDE Plasma 6 development packages (ECM, Plasma, KF6, etc.).
+
 ```bash
 git clone https://github.com/aaronkirschen/plasma-filteredtasks.git
-cp -r plasma-filteredtasks ~/.local/share/plasma/plasmoids/org.kde.plasma.filteredtasks
-kquitapp6 plasmashell && kstart plasmashell
+cd plasma-filteredtasks
+mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+make -j$(nproc)
+sudo make install
+```
+
+Then restart plasmashell:
+
+```bash
+plasmashell --replace &
 ```
 
 ### Adding to Your Panel
@@ -41,8 +54,11 @@ kquitapp6 plasmashell && kstart plasmashell
 
 ### Uninstall
 
+From the build directory:
+
 ```bash
-rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.filteredtasks && kquitapp6 plasmashell && kstart plasmashell
+sudo make uninstall
+plasmashell --replace &
 ```
 
 ## Configuration
