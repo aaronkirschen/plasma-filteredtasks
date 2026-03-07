@@ -90,6 +90,8 @@ KCMUtils.SimpleKCM {
     property bool cfg_exclusiveModeDefault
     property string cfg_syncGroup
     property string cfg_syncGroupDefault
+    property bool cfg_syncGroupingBlacklist
+    property bool cfg_syncGroupingBlacklistDefault
 
     Component.onCompleted: {
         /* Don't rely on bindings for checking the radiobuttons

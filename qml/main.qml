@@ -262,12 +262,13 @@ PlasmoidItem {
     }
 
     function _onSyncGroupingBlacklistChanged(newJson) {
+        if (!Plasmoid.configuration.syncGroupingBlacklist) return;
         _liveGroupingBlacklistJson = newJson;
         _applyGroupingBlacklist(newJson);
     }
 
     function _broadcastGroupingBlacklist() {
-        if (!_activeSyncGroup) return;
+        if (!_activeSyncGroup || !Plasmoid.configuration.syncGroupingBlacklist) return;
         var json = _serializeGroupingBlacklist();
         if (json === _liveGroupingBlacklistJson) return;
         _liveGroupingBlacklistJson = json;

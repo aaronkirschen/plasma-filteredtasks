@@ -170,6 +170,10 @@
       <label>Sync group name. Widgets with the same sync group keep their layout in sync. Empty means no sync.</label>
       <default></default>
     </entry>
+    <entry name="syncGroupingBlacklist" type="Bool">
+      <label>Whether to sync the per-app grouping toggle (Allow this program to be grouped) across widgets in the same sync group.</label>
+      <default>true</default>
+    </entry>
   </group>
 
 </kcfg>

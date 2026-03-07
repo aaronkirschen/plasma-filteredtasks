@@ -89,6 +89,8 @@ KCMUtils.SimpleKCM {
     property bool cfg_exclusiveModeDefault
     property string cfg_syncGroup
     property string cfg_syncGroupDefault
+    property alias cfg_syncGroupingBlacklist: syncGroupingBlacklist.checked
+    property bool cfg_syncGroupingBlacklistDefault
 
     headerPaddingEnabled: false
     header: ColumnLayout {
@@ -168,6 +170,12 @@ KCMUtils.SimpleKCM {
             text: i18nc("@option:check grouped task","Group only when the Task Manager is full")
             enabled: groupingStrategy.currentIndex > 0 && groupPopups.checked
             Accessible.onPressAction: toggle()
+        }
+
+        QQC2.CheckBox {
+            id: syncGroupingBlacklist
+            text: i18nc("@option:check grouped task", "Sync per-app grouping across synced widgets")
+            enabled: groupingStrategy.currentIndex > 0
         }
 
         Item {

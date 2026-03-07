@@ -91,6 +91,8 @@ KCMUtils.SimpleKCM {
     property int cfg_wheelEnabledDefault
     property bool cfg_wheelSkipMinimized
     property bool cfg_wheelSkipMinimizedDefault
+    property bool cfg_syncGroupingBlacklist
+    property bool cfg_syncGroupingBlacklistDefault
 
     property var layoutItems: []
     property bool _loading: true
