@@ -146,9 +146,9 @@ function activateNextPrevTask(anchor, next, wheelSkipMinimized, wheelEnabled, ta
     let taskIndexList = [];
     const activeTaskIndex = tasks.tasksModel.activeTask;
 
-    const taskCount = tasks.groupedMode ? tasks.taskRepeater.count : (tasks.taskList.children.length - 1);
+    const taskCount = tasks.sectionedMode ? tasks.taskRepeater.count : (tasks.taskList.children.length - 1);
     for (let i = 0; i < taskCount; ++i) {
-        const task = tasks.groupedMode ? tasks.taskRepeater.itemAt(i) : tasks.taskList.children[i];
+        const task = tasks.sectionedMode ? tasks.taskRepeater.itemAt(i) : tasks.taskList.children[i];
         if (!task || !task.visible) continue;
         const modelIndex = task.modelIndex(i);
 

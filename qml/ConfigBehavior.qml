@@ -83,8 +83,8 @@ KCMUtils.SimpleKCM {
     property bool cfg_taskHoverEffectDefault
     property int cfg_maxTextLines
     property int cfg_maxTextLinesDefault
-    property string cfg_taskGroups
-    property string cfg_taskGroupsDefault
+    property string cfg_taskSections
+    property string cfg_taskSectionsDefault
     property bool cfg_exclusiveMode
     property bool cfg_exclusiveModeDefault
     property string cfg_syncGroup

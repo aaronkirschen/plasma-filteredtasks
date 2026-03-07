@@ -11,11 +11,11 @@ import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 
 Item {
-    id: groupedLayout
+    id: sectionedLayout
 
     property var layoutItems: []
     property bool animating: false
-    property int dropTargetGroupIndex: -1
+    property int dropTargetSectionIndex: -1
     property int dropInsertIndex: -1
 
     // Split layoutItems into left-floated and right-floated arrays.
@@ -42,8 +42,8 @@ Item {
     // Whether we have any right-floated items (controls fill visibility)
     readonly property bool hasRightItems: rightItems.length > 0
 
-    implicitWidth: tasks.vertical ? groupColumn.implicitWidth : groupRow.implicitWidth
-    implicitHeight: tasks.vertical ? groupColumn.implicitHeight : groupRow.implicitHeight
+    implicitWidth: tasks.vertical ? sectionColumn.implicitWidth : sectionRow.implicitWidth
+    implicitHeight: tasks.vertical ? sectionColumn.implicitHeight : sectionRow.implicitHeight
 
     readonly property real minimumWidth: {
         var min = Infinity;
@@ -54,7 +54,7 @@ Item {
             var rep = repeaters[r];
             for (var g = 0; g < rep.count; g++) {
                 var section = rep.itemAt(g);
-                if (!section || !section.isGroup) continue;
+                if (!section || !section.isSection) continue;
                 var flow = section.taskFlow;
                 if (!flow) continue;
                 for (var c = 0; c < flow.children.length; c++) {
@@ -68,13 +68,13 @@ Item {
         return min === Infinity ? 0 : min;
     }
 
-    function groupForApp(appId) {
-        var ungroupedIdx = -1;
+    function sectionForApp(appId) {
+        var unsectionedIdx = -1;
         for (var i = 0; i < layoutItems.length; i++) {
             var item = layoutItems[i];
-            if (item.type !== "group") continue;
-            if (item.name === "__ungrouped") {
-                ungroupedIdx = i;
+            if (item.type !== "section") continue;
+            if (item.name === "__unsectioned") {
+                unsectionedIdx = i;
                 continue;
             }
             var ids = item.appIds || [];
@@ -82,7 +82,7 @@ Item {
                 if (ids[j] === appId) return i;
             }
         }
-        return ungroupedIdx;
+        return unsectionedIdx;
     }
 
     function _returnAllTasksToTaskList() {
@@ -97,15 +97,15 @@ Item {
     }
 
     function reparentTask(task) {
-        var gIdx = groupForApp(task.appId);
+        var gIdx = sectionForApp(task.appId);
         if (gIdx < 0) {
             task.visible = false;
             return;
         }
 
-        var isUngrouped = layoutItems[gIdx].name === "__ungrouped";
+        var isUnsectioned = layoutItems[gIdx].name === "__unsectioned";
 
-        if (isUngrouped && Plasmoid.configuration.exclusiveMode) {
+        if (isUnsectioned && Plasmoid.configuration.exclusiveMode) {
             var excluded = tasks.excludedByOthers;
             if (excluded) {
                 for (var k = 0; k < excluded.length; k++) {
@@ -117,30 +117,30 @@ Item {
             }
         }
 
-        var container = containerForGroup(gIdx);
+        var container = containerForSection(gIdx);
         if (container && task.parent !== container) {
             task.oldX = -1;
             task.oldY = -1;
             task.parent = container;
         }
         task.visible = true;
-        task.groupIndex = gIdx;
+        task.sectionIndex = gIdx;
     }
 
     function reparentAllTasks() {
-        // Build a map of groupIdx -> sorted task list
-        var groupTasks = {};  // groupIdx -> [task, ...]
+        // Build a map of sectionIdx -> sorted task list
+        var sectionTasks = {};  // sectionIdx -> [task, ...]
         for (var i = 0; i < tasks.taskRepeater.count; i++) {
             var task = tasks.taskRepeater.itemAt(i);
             if (!task) continue;
-            var gIdx = groupForApp(task.appId);
+            var gIdx = sectionForApp(task.appId);
             if (gIdx < 0) {
                 task.visible = false;
                 continue;
             }
 
-            var isUngrouped = layoutItems[gIdx].name === "__ungrouped";
-            if (isUngrouped && Plasmoid.configuration.exclusiveMode) {
+            var isUnsectioned = layoutItems[gIdx].name === "__unsectioned";
+            if (isUnsectioned && Plasmoid.configuration.exclusiveMode) {
                 var excluded = tasks.excludedByOthers;
                 var isExcluded = false;
                 if (excluded) {
@@ -158,16 +158,16 @@ Item {
             }
 
             task.visible = true;
-            task.groupIndex = gIdx;
-            if (!groupTasks[gIdx]) groupTasks[gIdx] = [];
-            groupTasks[gIdx].push(task);
+            task.sectionIndex = gIdx;
+            if (!sectionTasks[gIdx]) sectionTasks[gIdx] = [];
+            sectionTasks[gIdx].push(task);
         }
 
-        // For each group, sort tasks by appIds order, then reparent only if needed
-        for (var gIdx in groupTasks) {
-            var container = containerForGroup(parseInt(gIdx));
+        // For each section, sort tasks by appIds order, then reparent only if needed
+        for (var gIdx in sectionTasks) {
+            var container = containerForSection(parseInt(gIdx));
             if (!container) continue;
-            var tasksInGroup = groupTasks[gIdx];
+            var tasksInSection = sectionTasks[gIdx];
             var itemData = layoutItems[parseInt(gIdx)] || {};
             var appIds = itemData.appIds || [];
 
@@ -178,42 +178,42 @@ Item {
             }
 
             // Sort tasks: those in appIds by their order, others by model index
-            tasksInGroup.sort(function(a, b) {
+            tasksInSection.sort(function(a, b) {
                 var oa = (a.appId in orderMap) ? orderMap[a.appId] : 999999 + a.index;
                 var ob = (b.appId in orderMap) ? orderMap[b.appId] : 999999 + b.index;
                 return oa - ob;
             });
 
             // Check if all tasks are already in the correct container and order
-            var needsReorder = tasksInGroup.length > 0 && tasksInGroup[0].parent !== container;
+            var needsReorder = tasksInSection.length > 0 && tasksInSection[0].parent !== container;
             if (!needsReorder) {
                 // Check if Flow child order matches sorted order
                 var flowIdx = 0;
-                for (var c = 0; c < container.children.length && flowIdx < tasksInGroup.length; c++) {
+                for (var c = 0; c < container.children.length && flowIdx < tasksInSection.length; c++) {
                     var child = container.children[c];
                     if (child && child.appId !== undefined && child.visible) {
-                        if (child !== tasksInGroup[flowIdx]) {
+                        if (child !== tasksInSection[flowIdx]) {
                             needsReorder = true;
                             break;
                         }
                         flowIdx++;
                     }
                 }
-                if (flowIdx < tasksInGroup.length) needsReorder = true;
+                if (flowIdx < tasksInSection.length) needsReorder = true;
             }
 
             if (needsReorder) {
                 // Detach then re-add in sorted order (synchronous = no flash).
                 // Flow uses insertion order, so this controls visual ordering.
-                for (var d = 0; d < tasksInGroup.length; d++) {
-                    tasksInGroup[d].oldX = -1;
-                    tasksInGroup[d].oldY = -1;
-                    tasksInGroup[d].parent = tasks.taskList;
+                for (var d = 0; d < tasksInSection.length; d++) {
+                    tasksInSection[d].oldX = -1;
+                    tasksInSection[d].oldY = -1;
+                    tasksInSection[d].parent = tasks.taskList;
                 }
-                for (var r = 0; r < tasksInGroup.length; r++) {
-                    tasksInGroup[r].oldX = -1;
-                    tasksInGroup[r].oldY = -1;
-                    tasksInGroup[r].parent = container;
+                for (var r = 0; r < tasksInSection.length; r++) {
+                    tasksInSection[r].oldX = -1;
+                    tasksInSection[r].oldY = -1;
+                    tasksInSection[r].parent = container;
                 }
             }
         }
@@ -233,12 +233,12 @@ Item {
         return -1;
     }
 
-    // Move an app to the position of another app within a group's appIds.
+    // Move an app to the position of another app within a section's appIds.
     // Updates layoutItems in-place for immediate visual effect without
     // triggering the full _saveLayout → config persistence chain.
     // Returns true if a change was made.
-    function moveAppIdToPosition(groupIdx, appId, targetAppId) {
-        var itemData = layoutItems[groupIdx];
+    function moveAppIdToPosition(sectionIdx, appId, targetAppId) {
+        var itemData = layoutItems[sectionIdx];
         if (!itemData) return false;
         var ids = itemData.appIds || [];
         var fromIdx = ids.indexOf(appId);
@@ -251,13 +251,13 @@ Item {
         return true;
     }
 
-    // Reorder a single group's Flow children to match current appIds order.
+    // Reorder a single section's Flow children to match current appIds order.
     // Detaches and re-adds all tasks synchronously so parent references
     // are correct immediately after return.
-    function reorderGroupFlow(groupIdx) {
-        var container = containerForGroup(groupIdx);
+    function reorderSectionFlow(sectionIdx) {
+        var container = containerForSection(sectionIdx);
         if (!container) return;
-        var itemData = layoutItems[groupIdx] || {};
+        var itemData = layoutItems[sectionIdx] || {};
         var appIds = itemData.appIds || [];
         if (appIds.length < 2) return;
 
@@ -297,7 +297,7 @@ Item {
         }
     }
 
-    // Persist current in-memory layoutItems to config and sync group.
+    // Persist current in-memory layoutItems to config and sync section.
     function persistLayout() {
         tasks._saveLayout(layoutItems);
     }
@@ -313,13 +313,13 @@ Item {
     Connections {
         target: tasks
         function onDragSourceChanged() {
-            if (!tasks.dragSource && groupedLayout._dragDirty) {
+            if (!tasks.dragSource && sectionedLayout._dragDirty) {
                 // Persist the in-memory appIds order that was built up during drag
-                groupedLayout._dragDirty = false;
-                groupedLayout.persistLayout();
+                sectionedLayout._dragDirty = false;
+                sectionedLayout.persistLayout();
             }
             if (!tasks.dragSource) {
-                groupedLayout.dropInsertIndex = -1;
+                sectionedLayout.dropInsertIndex = -1;
                 dropIndicator.visible = false;
             }
         }
@@ -333,18 +333,18 @@ Item {
     function _searchRepeaterForTask(rep, x, y, isDragging, isVert) {
         for (var g = 0; g < rep.count; g++) {
             var section = rep.itemAt(g);
-            if (!section || !section.isGroup) continue;
+            if (!section || !section.isSection) continue;
             var flow = section.taskFlow;
             if (!flow) continue;
 
             // Only consider this section if the cursor is within its bounds
-            var sectionPos = section.mapFromItem(groupedLayout, x, y);
+            var sectionPos = section.mapFromItem(sectionedLayout, x, y);
             if (sectionPos.x < 0 || sectionPos.x > section.width
                 || sectionPos.y < 0 || sectionPos.y > section.height) {
                 continue;
             }
 
-            var localPos = flow.mapFromItem(groupedLayout, x, y);
+            var localPos = flow.mapFromItem(sectionedLayout, x, y);
 
             if (!isDragging) {
                 var child = flow.childAt(localPos.x, localPos.y);
@@ -393,12 +393,12 @@ Item {
         return _searchRepeaterForTask(repR, x, y, isDragging, isVert);
     }
 
-    // Helper: search a repeater for a group at position
-    function _searchRepeaterForGroup(rep, x, y) {
+    // Helper: search a repeater for a section at position
+    function _searchRepeaterForSection(rep, x, y) {
         for (var g = 0; g < rep.count; g++) {
             var section = rep.itemAt(g);
-            if (!section || !section.isGroup) continue;
-            var localPos = section.mapFromItem(groupedLayout, x, y);
+            if (!section || !section.isSection) continue;
+            var localPos = section.mapFromItem(sectionedLayout, x, y);
             if (localPos.x >= 0 && localPos.x <= section.width
                 && localPos.y >= 0 && localPos.y <= section.height) {
                 return section.origIndex;
@@ -407,24 +407,24 @@ Item {
         return -1;
     }
 
-    function groupIndexAtPosition(x, y) {
+    function sectionIndexAtPosition(x, y) {
         var repL = tasks.vertical ? repeaterLeftV : repeaterLeftH;
         var repR = tasks.vertical ? repeaterRightV : repeaterRightH;
-        var result = _searchRepeaterForGroup(repL, x, y);
+        var result = _searchRepeaterForSection(repL, x, y);
         if (result >= 0) return result;
-        return _searchRepeaterForGroup(repR, x, y);
+        return _searchRepeaterForSection(repR, x, y);
     }
 
     // ── Horizontal panel ──
     RowLayout {
-        id: groupRow
+        id: sectionRow
         anchors.fill: parent
         spacing: 0
         visible: !tasks.vertical
 
         Repeater {
             id: repeaterLeftH
-            model: groupedLayout.leftItems
+            model: sectionedLayout.leftItems
 
             delegate: Item {
                 id: sectionLH
@@ -433,14 +433,14 @@ Item {
 
                 readonly property int origIndex: modelData.origIndex
                 readonly property var itemData: modelData.data
-                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSection: (itemData.type || "section") === "section"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
-                property Item taskFlow: isGroup ? flowLH : null
+                property Item taskFlow: isSection ? flowLH : null
                 readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentWidth: {
-                    if (!isGroup) return 0;
+                    if (!isSection) return 0;
                     var w = 0;
                     for (var i = 0; i < flowLH.children.length; i++) {
                         var c = flowLH.children[i];
@@ -453,18 +453,18 @@ Item {
                 Layout.maximumWidth: isSpacer ? spacerSize : contentWidth
 
                 Rectangle {
-                    visible: sectionLH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionLH.origIndex && tasks.dragSource)
+                    visible: sectionLH.itemColor !== "" || (sectionedLayout.dropTargetSectionIndex === sectionLH.origIndex && tasks.dragSource)
                     anchors.fill: parent
                     color: sectionLH.itemColor || "transparent"
-                    border.color: (groupedLayout.dropTargetGroupIndex === sectionLH.origIndex && tasks.dragSource)
+                    border.color: (sectionedLayout.dropTargetSectionIndex === sectionLH.origIndex && tasks.dragSource)
                         ? Kirigami.Theme.highlightColor : "transparent"
-                    border.width: (groupedLayout.dropTargetGroupIndex === sectionLH.origIndex && tasks.dragSource) ? 2 : 0
+                    border.width: (sectionedLayout.dropTargetSectionIndex === sectionLH.origIndex && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
                 Flow {
                     id: flowLH
-                    visible: sectionLH.isGroup
+                    visible: sectionLH.isSection
                     anchors.fill: parent
                     spacing: 0
                     LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
@@ -484,12 +484,12 @@ Item {
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionLH.isGroup
+                    enabled: sectionLH.isSection
                     onTapped: function(eventPoint) {
                         var localPos = flowLH.mapFromItem(sectionLH, eventPoint.position.x, eventPoint.position.y);
                         var child = flowLH.childAt(localPos.x, localPos.y);
                         if (!child) {
-                            groupedLayout.showSectionMenu(sectionLH, sectionLH.origIndex);
+                            sectionedLayout.showSectionMenu(sectionLH, sectionLH.origIndex);
                         }
                     }
                 }
@@ -498,7 +498,7 @@ Item {
                     acceptedButtons: Qt.RightButton
                     enabled: sectionLH.isSpacer
                     onTapped: {
-                        groupedLayout.showSpacerMenu(sectionLH, sectionLH.origIndex);
+                        sectionedLayout.showSpacerMenu(sectionLH, sectionLH.origIndex);
                     }
                 }
 
@@ -506,12 +506,12 @@ Item {
             }
         }
 
-        // Fill space between left and right groups
+        // Fill space between left and right sections
         Item { Layout.fillWidth: true }
 
         Repeater {
             id: repeaterRightH
-            model: groupedLayout.rightItems
+            model: sectionedLayout.rightItems
 
             delegate: Item {
                 id: sectionRH
@@ -520,14 +520,14 @@ Item {
 
                 readonly property int origIndex: modelData.origIndex
                 readonly property var itemData: modelData.data
-                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSection: (itemData.type || "section") === "section"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
-                property Item taskFlow: isGroup ? flowRH : null
+                property Item taskFlow: isSection ? flowRH : null
                 readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentWidth: {
-                    if (!isGroup) return 0;
+                    if (!isSection) return 0;
                     var w = 0;
                     for (var i = 0; i < flowRH.children.length; i++) {
                         var c = flowRH.children[i];
@@ -540,18 +540,18 @@ Item {
                 Layout.maximumWidth: isSpacer ? spacerSize : contentWidth
 
                 Rectangle {
-                    visible: sectionRH.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionRH.origIndex && tasks.dragSource)
+                    visible: sectionRH.itemColor !== "" || (sectionedLayout.dropTargetSectionIndex === sectionRH.origIndex && tasks.dragSource)
                     anchors.fill: parent
                     color: sectionRH.itemColor || "transparent"
-                    border.color: (groupedLayout.dropTargetGroupIndex === sectionRH.origIndex && tasks.dragSource)
+                    border.color: (sectionedLayout.dropTargetSectionIndex === sectionRH.origIndex && tasks.dragSource)
                         ? Kirigami.Theme.highlightColor : "transparent"
-                    border.width: (groupedLayout.dropTargetGroupIndex === sectionRH.origIndex && tasks.dragSource) ? 2 : 0
+                    border.width: (sectionedLayout.dropTargetSectionIndex === sectionRH.origIndex && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
                 Flow {
                     id: flowRH
-                    visible: sectionRH.isGroup
+                    visible: sectionRH.isSection
                     anchors.fill: parent
                     spacing: 0
                     LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
@@ -571,12 +571,12 @@ Item {
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionRH.isGroup
+                    enabled: sectionRH.isSection
                     onTapped: function(eventPoint) {
                         var localPos = flowRH.mapFromItem(sectionRH, eventPoint.position.x, eventPoint.position.y);
                         var child = flowRH.childAt(localPos.x, localPos.y);
                         if (!child) {
-                            groupedLayout.showSectionMenu(sectionRH, sectionRH.origIndex);
+                            sectionedLayout.showSectionMenu(sectionRH, sectionRH.origIndex);
                         }
                     }
                 }
@@ -585,7 +585,7 @@ Item {
                     acceptedButtons: Qt.RightButton
                     enabled: sectionRH.isSpacer
                     onTapped: {
-                        groupedLayout.showSpacerMenu(sectionRH, sectionRH.origIndex);
+                        sectionedLayout.showSpacerMenu(sectionRH, sectionRH.origIndex);
                     }
                 }
 
@@ -596,14 +596,14 @@ Item {
 
     // ── Vertical panel ──
     ColumnLayout {
-        id: groupColumn
+        id: sectionColumn
         anchors.fill: parent
         spacing: 0
         visible: tasks.vertical
 
         Repeater {
             id: repeaterLeftV
-            model: groupedLayout.leftItems
+            model: sectionedLayout.leftItems
 
             delegate: Item {
                 id: sectionLV
@@ -612,14 +612,14 @@ Item {
 
                 readonly property int origIndex: modelData.origIndex
                 readonly property var itemData: modelData.data
-                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSection: (itemData.type || "section") === "section"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
-                property Item taskFlow: isGroup ? flowLV : null
+                property Item taskFlow: isSection ? flowLV : null
                 readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentHeight: {
-                    if (!isGroup) return 0;
+                    if (!isSection) return 0;
                     var h = 0;
                     for (var i = 0; i < flowLV.children.length; i++) {
                         var c = flowLV.children[i];
@@ -632,18 +632,18 @@ Item {
                 Layout.maximumHeight: isSpacer ? spacerSize : contentHeight
 
                 Rectangle {
-                    visible: sectionLV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionLV.origIndex && tasks.dragSource)
+                    visible: sectionLV.itemColor !== "" || (sectionedLayout.dropTargetSectionIndex === sectionLV.origIndex && tasks.dragSource)
                     anchors.fill: parent
                     color: sectionLV.itemColor || "transparent"
-                    border.color: (groupedLayout.dropTargetGroupIndex === sectionLV.origIndex && tasks.dragSource)
+                    border.color: (sectionedLayout.dropTargetSectionIndex === sectionLV.origIndex && tasks.dragSource)
                         ? Kirigami.Theme.highlightColor : "transparent"
-                    border.width: (groupedLayout.dropTargetGroupIndex === sectionLV.origIndex && tasks.dragSource) ? 2 : 0
+                    border.width: (sectionedLayout.dropTargetSectionIndex === sectionLV.origIndex && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
                 Flow {
                     id: flowLV
-                    visible: sectionLV.isGroup
+                    visible: sectionLV.isSection
                     anchors.fill: parent
                     spacing: 0
                     LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
@@ -663,12 +663,12 @@ Item {
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionLV.isGroup
+                    enabled: sectionLV.isSection
                     onTapped: function(eventPoint) {
                         var localPos = flowLV.mapFromItem(sectionLV, eventPoint.position.x, eventPoint.position.y);
                         var child = flowLV.childAt(localPos.x, localPos.y);
                         if (!child) {
-                            groupedLayout.showSectionMenu(sectionLV, sectionLV.origIndex);
+                            sectionedLayout.showSectionMenu(sectionLV, sectionLV.origIndex);
                         }
                     }
                 }
@@ -677,7 +677,7 @@ Item {
                     acceptedButtons: Qt.RightButton
                     enabled: sectionLV.isSpacer
                     onTapped: {
-                        groupedLayout.showSpacerMenu(sectionLV, sectionLV.origIndex);
+                        sectionedLayout.showSpacerMenu(sectionLV, sectionLV.origIndex);
                     }
                 }
 
@@ -685,12 +685,12 @@ Item {
             }
         }
 
-        // Fill space between top (left-floated) and bottom (right-floated) groups
+        // Fill space between top (left-floated) and bottom (right-floated) sections
         Item { Layout.fillHeight: true }
 
         Repeater {
             id: repeaterRightV
-            model: groupedLayout.rightItems
+            model: sectionedLayout.rightItems
 
             delegate: Item {
                 id: sectionRV
@@ -699,14 +699,14 @@ Item {
 
                 readonly property int origIndex: modelData.origIndex
                 readonly property var itemData: modelData.data
-                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSection: (itemData.type || "section") === "section"
                 readonly property bool isSpacer: itemData.type === "spacer"
                 readonly property string itemColor: itemData.color || ""
-                property Item taskFlow: isGroup ? flowRV : null
+                property Item taskFlow: isSection ? flowRV : null
                 readonly property real spacerSize: isSpacer ? tasks.resolveSpacerWidth(itemData.widthSpec || String(itemData.width || 8)) : 0
 
                 readonly property real contentHeight: {
-                    if (!isGroup) return 0;
+                    if (!isSection) return 0;
                     var h = 0;
                     for (var i = 0; i < flowRV.children.length; i++) {
                         var c = flowRV.children[i];
@@ -719,18 +719,18 @@ Item {
                 Layout.maximumHeight: isSpacer ? spacerSize : contentHeight
 
                 Rectangle {
-                    visible: sectionRV.itemColor !== "" || (groupedLayout.dropTargetGroupIndex === sectionRV.origIndex && tasks.dragSource)
+                    visible: sectionRV.itemColor !== "" || (sectionedLayout.dropTargetSectionIndex === sectionRV.origIndex && tasks.dragSource)
                     anchors.fill: parent
                     color: sectionRV.itemColor || "transparent"
-                    border.color: (groupedLayout.dropTargetGroupIndex === sectionRV.origIndex && tasks.dragSource)
+                    border.color: (sectionedLayout.dropTargetSectionIndex === sectionRV.origIndex && tasks.dragSource)
                         ? Kirigami.Theme.highlightColor : "transparent"
-                    border.width: (groupedLayout.dropTargetGroupIndex === sectionRV.origIndex && tasks.dragSource) ? 2 : 0
+                    border.width: (sectionedLayout.dropTargetSectionIndex === sectionRV.origIndex && tasks.dragSource) ? 2 : 0
                     radius: 4
                 }
 
                 Flow {
                     id: flowRV
-                    visible: sectionRV.isGroup
+                    visible: sectionRV.isSection
                     anchors.fill: parent
                     spacing: 0
                     LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, tasks.vertical)
@@ -750,12 +750,12 @@ Item {
 
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    enabled: sectionRV.isGroup
+                    enabled: sectionRV.isSection
                     onTapped: function(eventPoint) {
                         var localPos = flowRV.mapFromItem(sectionRV, eventPoint.position.x, eventPoint.position.y);
                         var child = flowRV.childAt(localPos.x, localPos.y);
                         if (!child) {
-                            groupedLayout.showSectionMenu(sectionRV, sectionRV.origIndex);
+                            sectionedLayout.showSectionMenu(sectionRV, sectionRV.origIndex);
                         }
                     }
                 }
@@ -764,7 +764,7 @@ Item {
                     acceptedButtons: Qt.RightButton
                     enabled: sectionRV.isSpacer
                     onTapped: {
-                        groupedLayout.showSpacerMenu(sectionRV, sectionRV.origIndex);
+                        sectionedLayout.showSpacerMenu(sectionRV, sectionRV.origIndex);
                     }
                 }
 
@@ -773,7 +773,7 @@ Item {
         }
     }
 
-    function containerForGroup(layoutIndex) {
+    function containerForSection(layoutIndex) {
         if (layoutIndex < 0 || layoutIndex >= layoutItems.length) return null;
         // Search both left and right repeaters
         var repeaters = tasks.vertical
@@ -784,7 +784,7 @@ Item {
             for (var g = 0; g < rep.count; g++) {
                 var section = rep.itemAt(g);
                 if (!section) continue;
-                if (section.origIndex === layoutIndex && section.isGroup) {
+                if (section.origIndex === layoutIndex && section.isSection) {
                     return section.taskFlow;
                 }
             }
@@ -792,7 +792,7 @@ Item {
         return null;
     }
 
-    readonly property Component sectionMenuComponent: Qt.createComponent("GroupSectionMenu.qml")
+    readonly property Component sectionMenuComponent: Qt.createComponent("SectionMenu.qml")
     readonly property Component spacerMenuComponent: Qt.createComponent("SpacerMenu.qml")
 
     function showSectionMenu(section, layoutIndex) {
@@ -818,11 +818,11 @@ Item {
     // ── Drop position indicator ──
 
     function updateDropIndicator() {
-        if (dropTargetGroupIndex < 0 || dropInsertIndex < 0 || !tasks.dragSource) {
+        if (dropTargetSectionIndex < 0 || dropInsertIndex < 0 || !tasks.dragSource) {
             dropIndicator.visible = false;
             return;
         }
-        var container = containerForGroup(dropTargetGroupIndex);
+        var container = containerForSection(dropTargetSectionIndex);
         if (!container) { dropIndicator.visible = false; return; }
 
         var isVert = tasks.vertical;
@@ -837,11 +837,11 @@ Item {
         var targetTask, pos;
         if (dropInsertIndex < visibleTasks.length) {
             targetTask = visibleTasks[dropInsertIndex];
-            pos = targetTask.mapToItem(groupedLayout, 0, 0);
+            pos = targetTask.mapToItem(sectionedLayout, 0, 0);
         } else {
             // After the last task
             targetTask = visibleTasks[visibleTasks.length - 1];
-            pos = targetTask.mapToItem(groupedLayout,
+            pos = targetTask.mapToItem(sectionedLayout,
                 isVert ? 0 : targetTask.width,
                 isVert ? targetTask.height : 0);
         }

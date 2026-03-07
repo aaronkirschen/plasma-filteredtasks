@@ -158,8 +158,8 @@
       <label> Spacing between icons in task manager. Margin is multiplied by this value.</label>
       <default>1</default>
     </entry>
-    <entry name="taskGroups" type="String">
-      <label>JSON array of layout items. Each item has a "type" field: "group" ({type,name,appIds,color}) or "spacer" ({type,width}). The special __ungrouped group shows all unassigned apps.</label>
+    <entry name="taskSections" type="String">
+      <label>JSON array of layout items. Each item has a "type" field: "section" ({type,name,appIds,color}) or "spacer" ({type,width}). The special __unsectioned section shows all unassigned apps.</label>
       <default></default>
     </entry>
     <entry name="exclusiveMode" type="Bool">

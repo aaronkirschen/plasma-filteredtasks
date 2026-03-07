@@ -20,8 +20,8 @@ import QtCore
 KCMUtils.SimpleKCM {
     id: root
 
-    property string cfg_taskGroups
-    property string cfg_taskGroupsDefault
+    property string cfg_taskSections
+    property string cfg_taskSectionsDefault
     property bool cfg_exclusiveMode
     property bool cfg_exclusiveModeDefault
     property string cfg_syncGroup
@@ -101,7 +101,7 @@ KCMUtils.SimpleKCM {
     property var deletedItem: null
     property int deletedIndex: -1
     property string draggedAppId: ""
-    property int dragSourceGroup: -1
+    property int dragSourceSection: -1
 
     // ── Layout model for DelegateModel ──
     ListModel { id: layoutModel }
@@ -124,14 +124,14 @@ KCMUtils.SimpleKCM {
 
     onLayoutItemsChanged: {
         if (_loading) return;
-        cfg_taskGroups = JSON.stringify(layoutItems);
+        cfg_taskSections = JSON.stringify(layoutItems);
         rebuildLayoutModel();
     }
 
     Component.onCompleted: {
         _loading = true;
         // If in a sync group, read persisted layout from the shared file
-        var source = cfg_taskGroups;
+        var source = cfg_taskSections;
         if (cfg_syncGroup) {
             var liveData = root._getSyncGroupLayout(cfg_syncGroup);
             if (liveData && liveData !== "") source = liveData;
@@ -142,7 +142,7 @@ KCMUtils.SimpleKCM {
             catch (e) { parsed = []; }
         }
         if (parsed.length === 0) {
-            parsed = [{type: "group", name: "__ungrouped", appIds: [], color: ""}];
+            parsed = [{type: "section", name: "__unsectioned", appIds: [], color: ""}];
         }
         layoutItems = parsed;
         _loading = false;
@@ -152,9 +152,9 @@ KCMUtils.SimpleKCM {
     }
 
     // ── Helpers ──
-    readonly property bool hasUngrouped: {
+    readonly property bool hasUnsectioned: {
         for (var i = 0; i < layoutItems.length; i++) {
-            if (layoutItems[i].type === "group" && layoutItems[i].name === "__ungrouped") return true;
+            if (layoutItems[i].type === "section" && layoutItems[i].name === "__unsectioned") return true;
         }
         return false;
     }
@@ -265,7 +265,7 @@ KCMUtils.SimpleKCM {
         return "application-x-executable";
     }
 
-    property int pickerTargetGroup: -1
+    property int pickerTargetSection: -1
 
     // ── Sync group state ──
     property var _knownSyncGroups: []
@@ -324,7 +324,7 @@ KCMUtils.SimpleKCM {
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: i18n("When enabled, apps assigned to groups in this widget won't appear in other Filtered Task Manager widgets.")
+            text: i18n("When enabled, apps assigned to sections in this widget won't appear in other Filtered Task Manager widgets.")
             wrapMode: Text.WordWrap
             font: Kirigami.Theme.smallFont
             opacity: 0.6
@@ -383,7 +383,7 @@ KCMUtils.SimpleKCM {
                                 var parsed = JSON.parse(liveData);
                                 if (parsed.length > 0) {
                                     root.layoutItems = parsed;
-                                    cfg_taskGroups = liveData;
+                                    cfg_taskSections = liveData;
                                 }
                             } catch(e) {}
                             root._loading = false;
@@ -499,7 +499,7 @@ KCMUtils.SimpleKCM {
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label {
                 Layout.fillWidth: true
-                text: i18n("Arrange groups and spacers in the order they appear on the panel.")
+                text: i18n("Arrange sections and spacers in the order they appear on the panel.")
                 wrapMode: Text.WordWrap
                 font: Kirigami.Theme.smallFont
                 opacity: 0.6
@@ -521,16 +521,16 @@ KCMUtils.SimpleKCM {
                 required property int origIndex
 
                 readonly property var itemData: root.layoutItems[origIndex] || {}
-                readonly property bool isGroup: (itemData.type || "group") === "group"
+                readonly property bool isSection: (itemData.type || "section") === "section"
                 readonly property bool isSpacer: itemData.type === "spacer"
-                readonly property bool isUngrouped: isGroup && itemData.name === "__ungrouped"
+                readonly property bool isUnsectioned: isSection && itemData.name === "__unsectioned"
 
                 property bool dragActive: card.handleArea.drag.active
 
                 width: layoutListView.width
                 height: content.implicitHeight + Kirigami.Units.smallSpacing
 
-                z: dragActive ? 1000 : (root.dragSourceGroup === origIndex ? 999 : 0)
+                z: dragActive ? 1000 : (root.dragSourceSection === origIndex ? 999 : 0)
 
                 // Keyboard reorder
                 Timer {
@@ -585,13 +585,13 @@ KCMUtils.SimpleKCM {
                     StandardCard {
                         id: card
                         width: parent.width
-                        name: delegateRoot.isUngrouped ? i18n("Ungrouped") : (delegateRoot.itemData.name || "")
-                        nameEditable: !delegateRoot.isSpacer && !delegateRoot.isUngrouped
-                        icon: delegateRoot.isUngrouped ? "application-x-executable" : (delegateRoot.isSpacer ? "distribute-horizontal-x" : (delegateRoot.itemData.icon || "view-list-icons"))
+                        name: delegateRoot.isUnsectioned ? i18n("Unsectioned") : (delegateRoot.itemData.name || "")
+                        nameEditable: !delegateRoot.isSpacer && !delegateRoot.isUnsectioned
+                        icon: delegateRoot.isUnsectioned ? "application-x-executable" : (delegateRoot.isSpacer ? "distribute-horizontal-x" : (delegateRoot.itemData.icon || "view-list-icons"))
                         itemColor: delegateRoot.itemData.color || ""
                         collapsed: root.collapsed
-                        collapsable: !delegateRoot.isSpacer && !delegateRoot.isUngrouped
-                        extraContentVisible: !root.collapsed && delegateRoot.isGroup && !delegateRoot.isUngrouped
+                        collapsable: !delegateRoot.isSpacer && !delegateRoot.isUnsectioned
+                        extraContentVisible: !root.collapsed && delegateRoot.isSection && !delegateRoot.isUnsectioned
                         dragTarget: content
                         upEnabled: delegateRoot.origIndex > 0
                         downEnabled: delegateRoot.origIndex < root.layoutItems.length - 1
@@ -641,7 +641,7 @@ KCMUtils.SimpleKCM {
 
                         rightControls: [
                             QQC2.Button {
-                                visible: delegateRoot.isGroup
+                                visible: delegateRoot.isSection
                                 readonly property bool isRight: (delegateRoot.itemData["float"] || "left") === "right"
                                 text: isRight ? i18n("Right") : i18n("Left")
                                 icon.name: isRight ? "align-horizontal-right" : "align-horizontal-left"
@@ -687,7 +687,7 @@ KCMUtils.SimpleKCM {
                                 icon.name: "list-add"
                                 Layout.alignment: Qt.AlignTop
                                 onClicked: {
-                                    root.pickerTargetGroup = delegateRoot.origIndex;
+                                    root.pickerTargetSection = delegateRoot.origIndex;
                                     appPickerPopup.open();
                                 }
                             }
@@ -728,14 +728,14 @@ KCMUtils.SimpleKCM {
                                                 chipRect._origX = chipRect.x;
                                                 chipRect._origY = chipRect.y;
                                                 root.draggedAppId = chipRect.modelData;
-                                                root.dragSourceGroup = delegateRoot.origIndex;
+                                                root.dragSourceSection = delegateRoot.origIndex;
                                             }
                                             onReleased: {
                                                 chipRect.Drag.drop();
                                                 chipRect.x = chipRect._origX;
                                                 chipRect.y = chipRect._origY;
                                                 root.draggedAppId = "";
-                                                root.dragSourceGroup = -1;
+                                                root.dragSourceSection = -1;
                                             }
                                         }
 
@@ -786,7 +786,7 @@ KCMUtils.SimpleKCM {
                             text: i18n("Add Apps...")
                             icon.name: "list-add"
                             onClicked: {
-                                root.pickerTargetGroup = delegateRoot.origIndex;
+                                root.pickerTargetSection = delegateRoot.origIndex;
                                 appPickerPopup.open();
                             }
                         }
@@ -807,7 +807,7 @@ KCMUtils.SimpleKCM {
                 DropArea {
                     anchors.fill: parent
                     keys: ["appChip"]
-                    enabled: delegateRoot.isGroup && !delegateRoot.isUngrouped
+                    enabled: delegateRoot.isSection && !delegateRoot.isUnsectioned
                     onEntered: card.outlineColor = Kirigami.Theme.highlightColor
                     onExited: card.outlineColor = Qt.binding(function() {
                         return delegateRoot.activeFocus ? Kirigami.Theme.highlightColor : (delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor);
@@ -817,7 +817,7 @@ KCMUtils.SimpleKCM {
                             return delegateRoot.activeFocus ? Kirigami.Theme.highlightColor : (delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor);
                         });
                         var appId = root.draggedAppId;
-                        var srcIdx = root.dragSourceGroup;
+                        var srcIdx = root.dragSourceSection;
                         var dstIdx = delegateRoot.origIndex;
                         if (!appId || srcIdx < 0 || srcIdx === dstIdx) return;
                         var items = root.layoutItems.slice();
@@ -858,11 +858,11 @@ KCMUtils.SimpleKCM {
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: i18n("Add Group")
+                text: i18n("Add Section")
                 icon.name: "list-add"
                 onClicked: {
                     var items = root.layoutItems.slice();
-                    items.push({type: "group", name: i18n("New Group"), icon: "view-list-icons", appIds: [], color: ""});
+                    items.push({type: "section", name: i18n("New Section"), icon: "view-list-icons", appIds: [], color: ""});
                     root.layoutItems = items;
                 }
             }
@@ -878,12 +878,12 @@ KCMUtils.SimpleKCM {
             }
 
             QQC2.Button {
-                visible: !root.hasUngrouped
-                text: i18n("Add Ungrouped")
+                visible: !root.hasUnsectioned
+                text: i18n("Add Unsectioned")
                 icon.name: "view-list-icons"
                 onClicked: {
                     var items = root.layoutItems.slice();
-                    items.push({type: "group", name: "__ungrouped", appIds: [], color: ""});
+                    items.push({type: "section", name: "__unsectioned", appIds: [], color: ""});
                     root.layoutItems = items;
                 }
             }
@@ -968,7 +968,7 @@ KCMUtils.SimpleKCM {
 
             Kirigami.Heading {
                 level: 3
-                text: i18n("Add Apps to Group")
+                text: i18n("Add Apps to Section")
             }
 
             Kirigami.SearchField {
@@ -1000,10 +1000,10 @@ KCMUtils.SimpleKCM {
                     required property string genericName
                     required property string comment
 
-                    readonly property bool alreadyInGroup: {
-                        if (root.pickerTargetGroup < 0) return false;
-                        var g = root.layoutItems[root.pickerTargetGroup];
-                        if (!g || g.type !== "group") return false;
+                    readonly property bool alreadyInSection: {
+                        if (root.pickerTargetSection < 0) return false;
+                        var g = root.layoutItems[root.pickerTargetSection];
+                        if (!g || g.type !== "section") return false;
                         return (g.appIds || []).indexOf(appId) >= 0;
                     }
 
@@ -1024,10 +1024,10 @@ KCMUtils.SimpleKCM {
                     QQC2.ItemDelegate {
                         id: pickerButton
                         anchors.fill: parent
-                        highlighted: pickerDel.alreadyInGroup
+                        highlighted: pickerDel.alreadyInSection
                         onClicked: {
-                            if (pickerDel.alreadyInGroup) return;
-                            var gi = root.pickerTargetGroup;
+                            if (pickerDel.alreadyInSection) return;
+                            var gi = root.pickerTargetSection;
                             if (gi < 0 || gi >= root.layoutItems.length) return;
                             var items = root.layoutItems.slice();
                             var ids = (items[gi].appIds || []).slice();
@@ -1050,7 +1050,7 @@ KCMUtils.SimpleKCM {
                                     text: pickerDel.name
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
-                                    font.bold: pickerDel.alreadyInGroup
+                                    font.bold: pickerDel.alreadyInSection
                                 }
                                 QQC2.Label {
                                     text: pickerDel.appId
@@ -1061,10 +1061,10 @@ KCMUtils.SimpleKCM {
                                 }
                             }
                             Kirigami.Icon {
-                                source: pickerDel.alreadyInGroup ? "dialog-ok-apply" : "list-add"
+                                source: pickerDel.alreadyInSection ? "dialog-ok-apply" : "list-add"
                                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                                 Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                                opacity: pickerDel.alreadyInGroup ? 1.0 : 0.4
+                                opacity: pickerDel.alreadyInSection ? 1.0 : 0.4
                             }
                         }
                     }

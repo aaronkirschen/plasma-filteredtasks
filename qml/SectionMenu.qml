@@ -17,7 +17,7 @@ PlasmaExtras.Menu {
 
     readonly property var itemData: (tasksRoot && layoutIndex >= 0 && layoutIndex < tasksRoot.parsedLayout.length)
         ? tasksRoot.parsedLayout[layoutIndex] : {}
-    readonly property bool isUngrouped: (itemData.name || "") === "__ungrouped"
+    readonly property bool isUnsectioned: (itemData.name || "") === "__unsectioned"
 
     placement: {
         if (Plasmoid.location === PlasmaCore.Types.LeftEdge) {
@@ -38,9 +38,9 @@ PlasmaExtras.Menu {
     }
 
     PlasmaExtras.MenuItem {
-        text: i18n("Rename Group...")
+        text: i18n("Rename Section...")
         icon: "edit-rename"
-        visible: !sectionMenu.isUngrouped
+        visible: !sectionMenu.isUnsectioned
 
         onClicked: {
             var root = sectionMenu.tasksRoot;
@@ -49,12 +49,12 @@ PlasmaExtras.Menu {
             var dlg = root.inputDialogComponent.createObject(root, {
                 visualParent: sectionMenu.visualParent,
                 visible: true,
-                title: i18n("Rename Group"),
+                title: i18n("Rename Section"),
                 value: sectionMenu.itemData.name || "",
-                placeholderText: i18n("Enter group name...")
+                placeholderText: i18n("Enter section name...")
             });
             dlg.accepted.connect(function(text) {
-                root.renameGroup(idx, text);
+                root.renameSection(idx, text);
             });
         }
     }
@@ -65,14 +65,14 @@ PlasmaExtras.Menu {
         icon: isRight ? "align-horizontal-left" : "align-horizontal-right"
 
         onClicked: {
-            sectionMenu.tasksRoot.setGroupFloat(sectionMenu.layoutIndex, isRight ? "left" : "right");
+            sectionMenu.tasksRoot.setSectionFloat(sectionMenu.layoutIndex, isRight ? "left" : "right");
         }
     }
 
     PlasmaExtras.MenuItem {
-        text: i18n("Remove Group")
+        text: i18n("Remove Section")
         icon: "edit-delete"
-        visible: !sectionMenu.isUngrouped
+        visible: !sectionMenu.isUnsectioned
 
         onClicked: {
             sectionMenu.tasksRoot.removeLayoutItem(sectionMenu.layoutIndex);
@@ -81,7 +81,7 @@ PlasmaExtras.Menu {
 
     PlasmaExtras.MenuItem {
         separator: true
-        visible: !sectionMenu.isUngrouped
+        visible: !sectionMenu.isUnsectioned
     }
 
     PlasmaExtras.MenuItem {
@@ -103,7 +103,7 @@ PlasmaExtras.Menu {
     }
 
     PlasmaExtras.MenuItem {
-        text: i18n("Add Group Before...")
+        text: i18n("Add Section Before...")
         icon: "list-add"
 
         onClicked: {
@@ -113,12 +113,12 @@ PlasmaExtras.Menu {
             var dlg = root.inputDialogComponent.createObject(root, {
                 visualParent: sectionMenu.visualParent,
                 visible: true,
-                title: i18n("Group Name"),
-                value: "New Group",
-                placeholderText: i18n("Enter group name...")
+                title: i18n("Section Name"),
+                value: "New Section",
+                placeholderText: i18n("Enter section name...")
             });
             dlg.accepted.connect(function(text) {
-                root.addGroupAt(idx, text);
+                root.addSectionAt(idx, text);
             });
         }
     }

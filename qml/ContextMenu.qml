@@ -67,8 +67,8 @@ PlasmaExtras.Menu {
         if (visualParent && get(atm.LauncherUrlWithoutIcon).toString() !== "" && status === PlasmaExtras.Menu.Open) {
             activitiesDesktopsMenu.refresh();
         }
-        if (visualParent && status === PlasmaExtras.Menu.Open && tasks.groupedMode) {
-            moveToGroupMenu.refresh();
+        if (visualParent && status === PlasmaExtras.Menu.Open && tasks.sectionedMode) {
+            moveToSectionMenu.refresh();
         }
         if (status === PlasmaExtras.Menu.Closed) {
             menu.destroy();
@@ -758,57 +758,57 @@ PlasmaExtras.Menu {
     }
 
     PlasmaExtras.MenuItem {
-        id: moveToGroupMenuItem
+        id: moveToSectionMenuItem
 
-        visible: tasks.groupedMode && visualParent && !get(atm.IsLauncher) && !get(atm.IsStartup)
+        visible: tasks.sectionedMode && visualParent && !get(atm.IsLauncher) && !get(atm.IsStartup)
         enabled: visible
 
-        text: i18n("Move to &Group")
+        text: i18n("Move to &Section")
         icon: "folder-move"
 
-        readonly property PlasmaExtras.Menu _moveToGroupMenu: PlasmaExtras.Menu {
-            id: moveToGroupMenu
+        readonly property PlasmaExtras.Menu _moveToSectionMenu: PlasmaExtras.Menu {
+            id: moveToSectionMenu
 
-            visualParent: moveToGroupMenuItem.action
+            visualParent: moveToSectionMenuItem.action
 
             function refresh() {
                 clearMenuItems();
 
-                if (!menu.visualParent || !tasks.groupedMode) return;
+                if (!menu.visualParent || !tasks.sectionedMode) return;
 
                 var appId = menu.visualParent.appId;
-                var currentIdx = menu.visualParent.groupIndex;
+                var currentIdx = menu.visualParent.sectionIndex;
                 var layout = tasks.parsedLayout;
 
                 for (var i = 0; i < layout.length; i++) {
-                    if (layout[i].type !== "group") continue;
+                    if (layout[i].type !== "section") continue;
                     if (i === currentIdx) continue;
                     var name = layout[i].name;
-                    var displayName = (name === "__ungrouped") ? i18n("Ungrouped") : name;
-                    var menuItem = menu.newMenuItem(moveToGroupMenu);
+                    var displayName = (name === "__unsectioned") ? i18n("Unsectioned") : name;
+                    var menuItem = menu.newMenuItem(moveToSectionMenu);
                     menuItem.text = displayName;
                     menuItem.clicked.connect((function(aid, from, to, root) {
-                        return function() { root.moveAppToGroup(aid, from, to); };
+                        return function() { root.moveAppToSection(aid, from, to); };
                     })(appId, currentIdx, i, tasks));
                 }
 
-                menu.newSeparator(moveToGroupMenu);
+                menu.newSeparator(moveToSectionMenu);
 
-                var newGroupItem = menu.newMenuItem(moveToGroupMenu);
-                newGroupItem.text = i18n("New Group...");
-                newGroupItem.icon = "list-add";
-                newGroupItem.clicked.connect((function(aid, from, vp, root) {
+                var newSectionItem = menu.newMenuItem(moveToSectionMenu);
+                newSectionItem.text = i18n("New Section...");
+                newSectionItem.icon = "list-add";
+                newSectionItem.clicked.connect((function(aid, from, vp, root) {
                     return function() {
                         if (root.inputDialogComponent.status !== Component.Ready) return;
                         var dlg = root.inputDialogComponent.createObject(root, {
                             visualParent: vp,
                             visible: true,
-                            title: i18n("Group Name"),
-                            value: "New Group",
-                            placeholderText: i18n("Enter group name...")
+                            title: i18n("Section Name"),
+                            value: "New Section",
+                            placeholderText: i18n("Enter section name...")
                         });
                         dlg.accepted.connect(function(text) {
-                            root.addAppToNewGroup(aid, from, text);
+                            root.addAppToNewSection(aid, from, text);
                         });
                     };
                 })(appId, currentIdx, menu.visualParent, tasks));
@@ -819,60 +819,60 @@ PlasmaExtras.Menu {
     }
 
     PlasmaExtras.MenuItem {
-        id: removeFromGroupItem
+        id: removeFromSectionItem
 
         visible: {
-            if (!tasks.groupedMode || !visualParent || get(atm.IsLauncher) || get(atm.IsStartup)) return false;
-            var gIdx = visualParent.groupIndex;
+            if (!tasks.sectionedMode || !visualParent || get(atm.IsLauncher) || get(atm.IsStartup)) return false;
+            var gIdx = visualParent.sectionIndex;
             if (gIdx < 0) return false;
             var layout = tasks.parsedLayout;
             if (gIdx >= layout.length) return false;
-            return layout[gIdx].type === "group" && layout[gIdx].name !== "__ungrouped";
+            return layout[gIdx].type === "section" && layout[gIdx].name !== "__unsectioned";
         }
 
-        text: i18n("Remove from Group")
+        text: i18n("Remove from Section")
         icon: "list-remove"
 
         onClicked: {
             var appId = visualParent.appId;
-            var fromIdx = visualParent.groupIndex;
-            // Find ungrouped index
+            var fromIdx = visualParent.sectionIndex;
+            // Find unsectioned index
             var layout = tasks.parsedLayout;
-            var ungroupedIdx = -1;
+            var unsectionedIdx = -1;
             for (var i = 0; i < layout.length; i++) {
-                if (layout[i].type === "group" && layout[i].name === "__ungrouped") {
-                    ungroupedIdx = i;
+                if (layout[i].type === "section" && layout[i].name === "__unsectioned") {
+                    unsectionedIdx = i;
                     break;
                 }
             }
-            if (ungroupedIdx >= 0) {
-                tasks.moveAppToGroup(appId, fromIdx, ungroupedIdx);
+            if (unsectionedIdx >= 0) {
+                tasks.moveAppToSection(appId, fromIdx, unsectionedIdx);
             }
         }
     }
 
     PlasmaExtras.MenuItem {
-        id: addSpacerBeforeGroupItem
+        id: addSpacerBeforeSectionItem
 
-        visible: tasks.groupedMode && visualParent && !get(atm.IsLauncher) && !get(atm.IsStartup)
-            && visualParent && visualParent.groupIndex >= 0
+        visible: tasks.sectionedMode && visualParent && !get(atm.IsLauncher) && !get(atm.IsStartup)
+            && visualParent && visualParent.sectionIndex >= 0
 
         text: {
             if (!visible || !visualParent) return "";
-            var gIdx = visualParent.groupIndex;
+            var gIdx = visualParent.sectionIndex;
             var layout = tasks.parsedLayout;
-            if (gIdx >= 0 && gIdx < layout.length && layout[gIdx].type === "group") {
+            if (gIdx >= 0 && gIdx < layout.length && layout[gIdx].type === "section") {
                 var name = layout[gIdx].name;
-                var displayName = (name === "__ungrouped") ? i18n("Ungrouped") : name;
+                var displayName = (name === "__unsectioned") ? i18n("Unsectioned") : name;
                 return i18n("Add Spacer Before \"%1\"", displayName);
             }
-            return i18n("Add Spacer Before Group");
+            return i18n("Add Spacer Before Section");
         }
         icon: "distribute-horizontal"
 
         onClicked: {
-            if (visualParent && visualParent.groupIndex >= 0) {
-                tasks.addSpacerAt(visualParent.groupIndex);
+            if (visualParent && visualParent.sectionIndex >= 0) {
+                tasks.addSpacerAt(visualParent.sectionIndex);
             }
         }
     }

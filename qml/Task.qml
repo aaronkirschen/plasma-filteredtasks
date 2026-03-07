@@ -34,13 +34,13 @@ PlasmaCore.ToolTipArea {
 
     implicitHeight: inPopup
         ? LayoutMetrics.preferredHeightInPopup()
-        : (tasksRoot.vertical && tasksRoot.groupedMode
+        : (tasksRoot.vertical && tasksRoot.sectionedMode
             ? LayoutMetrics.preferredMaxHeight()
             : Math.max(tasksRoot.height / tasksRoot.plasmoid.configuration.maxStripes,
                      LayoutMetrics.preferredMinHeight()))
     implicitWidth: tasksRoot.vertical
         ? Math.max(LayoutMetrics.preferredMinWidth(), Math.min(LayoutMetrics.preferredMaxWidth(), tasksRoot.width / tasksRoot.plasmoid.configuration.maxStripes))
-        : (tasksRoot.groupedMode ? LayoutMetrics.preferredMaxWidth() : 0)
+        : (tasksRoot.sectionedMode ? LayoutMetrics.preferredMaxWidth() : 0)
 
     Layout.fillWidth: true
     Layout.fillHeight: !inPopup
@@ -56,7 +56,7 @@ PlasmaCore.ToolTipArea {
     readonly property int pid: model.AppPid
     readonly property string appName: model.AppName
     readonly property string appId: model.AppId.replace(/\.desktop/, '')
-    property int groupIndex: -1
+    property int sectionIndex: -1
 
     opacity: (tasksRoot.dragSource === task) ? 0.4 : 1.0
     Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
@@ -688,8 +688,8 @@ PlasmaCore.ToolTipArea {
     ]
 
     onAppIdChanged: {
-        if (completed && !inPopup && tasksRoot.groupedMode) {
-            tasksRoot.groupedLayout.reparentTask(task);
+        if (completed && !inPopup && tasksRoot.sectionedMode) {
+            tasksRoot.sectionedLayout.reparentTask(task);
         }
     }
 

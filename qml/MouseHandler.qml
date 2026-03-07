@@ -43,7 +43,7 @@ DropArea {
         }
 
         // Skip reorder logic until cursor has moved a minimum distance from drag start
-        if (tasks.groupedMode && tasks.dragSource && !dragMovedPastThreshold) {
+        if (tasks.sectionedMode && tasks.dragSource && !dragMovedPastThreshold) {
             var dx = event.x - dragStartPos.x;
             var dy = event.y - dragStartPos.y;
             if (dx * dx + dy * dy < 25) { // 5px threshold
@@ -55,23 +55,23 @@ DropArea {
         let above;
         if (isGroupDialog) {
             above = target.itemAt(event.x, event.y);
-        } else if (tasks.groupedMode) {
-            var mapped = tasks.groupedLayout.mapFromItem(dropArea, event.x, event.y);
-            above = tasks.groupedLayout.taskAtPosition(mapped.x, mapped.y);
+        } else if (tasks.sectionedMode) {
+            var mapped = tasks.sectionedLayout.mapFromItem(dropArea, event.x, event.y);
+            above = tasks.sectionedLayout.taskAtPosition(mapped.x, mapped.y);
         } else {
             above = target.childAt(event.x, event.y);
         }
 
         if (!above) {
-            if (tasks.groupedMode && tasks.dragSource) {
-                var mappedPos = tasks.groupedLayout.mapFromItem(dropArea, event.x, event.y);
-                var targetIdx = tasks.groupedLayout.groupIndexAtPosition(mappedPos.x, mappedPos.y);
-                tasks.groupedLayout.dropTargetGroupIndex = targetIdx;
-                tasks.groupedLayout.dropInsertIndex = -1;
-                tasks.groupedLayout.updateDropIndicator();
-                if (targetIdx >= 0 && tasks.dragSource.groupIndex >= 0
-                    && tasks.dragSource.groupIndex !== targetIdx) {
-                    tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, targetIdx);
+            if (tasks.sectionedMode && tasks.dragSource) {
+                var mappedPos = tasks.sectionedLayout.mapFromItem(dropArea, event.x, event.y);
+                var targetIdx = tasks.sectionedLayout.sectionIndexAtPosition(mappedPos.x, mappedPos.y);
+                tasks.sectionedLayout.dropTargetSectionIndex = targetIdx;
+                tasks.sectionedLayout.dropInsertIndex = -1;
+                tasks.sectionedLayout.updateDropIndicator();
+                if (targetIdx >= 0 && tasks.dragSource.sectionIndex >= 0
+                    && tasks.dragSource.sectionIndex !== targetIdx) {
+                    tasks.moveAppToSection(tasks.dragSource.appId, tasks.dragSource.sectionIndex, targetIdx);
                 }
             }
             hoveredItem = null;
@@ -99,41 +99,41 @@ DropArea {
             ignoredItem = null;
         }
 
-        if (tasks.groupedMode && tasks.dragSource && above.groupIndex >= 0) {
-            tasks.groupedLayout.dropTargetGroupIndex = above.groupIndex;
+        if (tasks.sectionedMode && tasks.dragSource && above.sectionIndex >= 0) {
+            tasks.sectionedLayout.dropTargetSectionIndex = above.sectionIndex;
         }
 
         if (tasksModel.sortMode === TaskManager.TasksModel.SortManual && tasks.dragSource) {
-            if (tasks.groupedMode) {
-                // ── Grouped mode drag: use visual position, not model index ──
+            if (tasks.sectionedMode) {
+                // ── Sectioned mode drag: use visual position, not model index ──
 
-                // Cross-group drag
+                // Cross-section drag
                 if (tasks.dragSource.parent !== above.parent) {
-                    if (tasks.dragSource.groupIndex >= 0
-                        && above.groupIndex >= 0 && tasks.dragSource.groupIndex !== above.groupIndex) {
-                        tasks.moveAppToGroup(tasks.dragSource.appId, tasks.dragSource.groupIndex, above.groupIndex);
+                    if (tasks.dragSource.sectionIndex >= 0
+                        && above.sectionIndex >= 0 && tasks.dragSource.sectionIndex !== above.sectionIndex) {
+                        tasks.moveAppToSection(tasks.dragSource.appId, tasks.dragSource.sectionIndex, above.sectionIndex);
                     }
-                    tasks.groupedLayout.dropInsertIndex = -1;
-                    tasks.groupedLayout.updateDropIndicator();
+                    tasks.sectionedLayout.dropInsertIndex = -1;
+                    tasks.sectionedLayout.updateDropIndicator();
                     return;
                 }
 
-                // Same-group drag: compare visual positions within the Flow
+                // Same-section drag: compare visual positions within the Flow
                 if (tasks.dragSource !== above) {
-                    tasks.groupedLayout.dropInsertIndex = tasks.groupedLayout.visualIndexInFlow(above);
-                    if (tasks.groupedLayout.moveAppIdToPosition(
-                            tasks.dragSource.groupIndex, tasks.dragSource.appId, above.appId)) {
-                        tasks.groupedLayout.reorderGroupFlow(tasks.dragSource.groupIndex);
+                    tasks.sectionedLayout.dropInsertIndex = tasks.sectionedLayout.visualIndexInFlow(above);
+                    if (tasks.sectionedLayout.moveAppIdToPosition(
+                            tasks.dragSource.sectionIndex, tasks.dragSource.appId, above.appId)) {
+                        tasks.sectionedLayout.reorderSectionFlow(tasks.dragSource.sectionIndex);
                     }
-                    tasks.groupedLayout.updateDropIndicator();
+                    tasks.sectionedLayout.updateDropIndicator();
                 } else {
-                    tasks.groupedLayout.dropInsertIndex = tasks.groupedLayout.visualIndexInFlow(above);
-                    tasks.groupedLayout.updateDropIndicator();
+                    tasks.sectionedLayout.dropInsertIndex = tasks.sectionedLayout.visualIndexInFlow(above);
+                    tasks.sectionedLayout.updateDropIndicator();
                 }
             } else {
-                // ── Non-grouped mode drag: use model index ──
+                // ── Non-sectioned mode drag: use model index ──
 
-                // Different parent check (shouldn't happen without groupedMode, but kept for safety)
+                // Different parent check (shouldn't happen without sectionedMode, but kept for safety)
                 if (tasks.dragSource.parent !== above.parent) {
                     return;
                 }
@@ -161,18 +161,18 @@ DropArea {
     onExited: {
         hoveredItem = null;
         activationTimer.stop();
-        if (tasks.groupedMode) {
-            tasks.groupedLayout.dropTargetGroupIndex = -1;
-            tasks.groupedLayout.dropInsertIndex = -1;
-            tasks.groupedLayout.updateDropIndicator();
+        if (tasks.sectionedMode) {
+            tasks.sectionedLayout.dropTargetSectionIndex = -1;
+            tasks.sectionedLayout.dropInsertIndex = -1;
+            tasks.sectionedLayout.updateDropIndicator();
         }
     }
 
     onDropped: event => {
-        if (tasks.groupedMode) {
-            tasks.groupedLayout.dropTargetGroupIndex = -1;
-            tasks.groupedLayout.dropInsertIndex = -1;
-            tasks.groupedLayout.updateDropIndicator();
+        if (tasks.sectionedMode) {
+            tasks.sectionedLayout.dropTargetSectionIndex = -1;
+            tasks.sectionedLayout.dropInsertIndex = -1;
+            tasks.sectionedLayout.updateDropIndicator();
         }
         // Reject internal drops.
         if (event.formats.indexOf("application/x-orgkdeplasmataskmanager_taskbuttonitem") >= 0) {

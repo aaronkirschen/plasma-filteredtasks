@@ -35,12 +35,12 @@ plasma_add_applet(org.kde.plasma.filteredtasks
         qml/config.qml
         qml/ConfigAppearance.qml
         qml/ConfigBehavior.qml
-        qml/ConfigGroups.qml
+        qml/ConfigSections.qml
         qml/ContextMenu.qml
         qml/GroupDialog.qml
-        qml/GroupedTaskLayout.qml
+        qml/SectionedTaskLayout.qml
         qml/GroupExpanderOverlay.qml
-        qml/GroupSectionMenu.qml
+        qml/SectionMenu.qml
         qml/InlineInputDialog.qml
         qml/main.qml
         qml/MouseHandler.qml

@@ -54,23 +54,23 @@ PlasmoidItem {
     // Live grouping blacklist JSON — tracks which apps have grouping disabled, synced like launchers.
     property string _liveGroupingBlacklistJson: ""
 
-    // Parsed layout: mixed array of group and spacer items from config
+    // Parsed layout: mixed array of section and spacer items from config
     readonly property var parsedLayout: {
         var raw = _liveLayoutJson;
         if (!raw || raw.trim() === "") return [];
         try { return JSON.parse(raw); }
         catch (e) { return []; }
     }
-    readonly property bool groupedMode: parsedLayout.length > 0
+    readonly property bool sectionedMode: parsedLayout.length > 0
     property alias taskRepeater: taskRepeater
-    property alias groupedLayout: groupedLayout
+    property alias sectionedLayout: sectionedLayout
 
-    // Collect all claimed app IDs (from named groups, not ungrouped or spacers)
+    // Collect all claimed app IDs (from named sections, not unsectioned or spacers)
     readonly property var allClaimedAppIds: {
         var ids = [];
         for (var i = 0; i < parsedLayout.length; i++) {
             var item = parsedLayout[i];
-            if (item.type !== "group" || item.name === "__ungrouped") continue;
+            if (item.type !== "section" || item.name === "__unsectioned") continue;
             var appIds = item.appIds || [];
             for (var j = 0; j < appIds.length; j++) {
                 ids.push(appIds[j]);
@@ -133,7 +133,7 @@ PlasmoidItem {
         onTriggered: {
             tasks._writeClaims();
             tasks._readOtherClaims();
-            if (tasks.groupedMode) groupedLayout.reparentAllTasks();
+            if (tasks.sectionedMode) sectionedLayout.reparentAllTasks();
         }
     }
 
@@ -159,7 +159,7 @@ PlasmoidItem {
             syncNamesStore.setValue("names", arr.join("|"));
         }
         // Also persist current layout so config dialogs (separate process) can read it
-        syncNamesStore.setValue("layout_" + name, Plasmoid.configuration.taskGroups);
+        syncNamesStore.setValue("layout_" + name, Plasmoid.configuration.taskSections);
         syncNamesStore.sync();
     }
 
@@ -197,22 +197,22 @@ PlasmoidItem {
         if (oldGroup) _unregisterSyncGroupName(oldGroup);
         if (!name) {
             // No sync group — use local config directly
-            _liveLayoutJson = Plasmoid.configuration.taskGroups;
+            _liveLayoutJson = Plasmoid.configuration.taskSections;
             return;
         }
         // Join the group; returns existing layout, launchers, and grouping blacklist if another widget is already in it
         var localLaunchers = JSON.stringify(Plasmoid.configuration.launchers);
         var localBlacklist = _serializeGroupingBlacklist();
         var result = TaskTools.joinSyncGroup(name, _syncInstanceId,
-            _onSyncLayoutChanged, Plasmoid.configuration.taskGroups,
+            _onSyncLayoutChanged, Plasmoid.configuration.taskSections,
             _onSyncLaunchersChanged, localLaunchers,
             _onSyncGroupingBlacklistChanged, localBlacklist);
         // Adopt layout
         if (result.layout && result.layout !== "") {
             _liveLayoutJson = result.layout;
-            Plasmoid.configuration.taskGroups = result.layout;
+            Plasmoid.configuration.taskSections = result.layout;
         } else {
-            _liveLayoutJson = Plasmoid.configuration.taskGroups;
+            _liveLayoutJson = Plasmoid.configuration.taskSections;
         }
         // Adopt launchers
         if (result.launchers && result.launchers !== "") {
@@ -236,7 +236,7 @@ PlasmoidItem {
 
     function _onSyncLayoutChanged(newJson) {
         _liveLayoutJson = newJson;
-        Plasmoid.configuration.taskGroups = newJson;
+        Plasmoid.configuration.taskSections = newJson;
     }
 
     function _onSyncLaunchersChanged(newLaunchersJson) {
@@ -280,13 +280,13 @@ PlasmoidItem {
         function onSyncGroupChanged() { tasks._joinSyncGroup(); }
         function onExclusiveModeChanged() {
             tasks._readOtherClaims();
-            if (tasks.groupedMode) groupedLayout.reparentAllTasks();
+            if (tasks.sectionedMode) sectionedLayout.reparentAllTasks();
         }
-        function onTaskGroupsChanged() {
+        function onTaskSectionsChanged() {
             // Pick up external config changes (e.g. from config dialog Apply).
             // If _saveLayout or _onSyncLayoutChanged already set _liveLayoutJson
             // to this value, this is a no-op due to string comparison.
-            var cfg = Plasmoid.configuration.taskGroups;
+            var cfg = Plasmoid.configuration.taskSections;
             if (cfg !== tasks._liveLayoutJson) {
                 tasks._liveLayoutJson = cfg;
                 if (tasks._activeSyncGroup) {
@@ -300,22 +300,22 @@ PlasmoidItem {
     function _saveLayout(items) {
         var json = JSON.stringify(items);
         _liveLayoutJson = json;
-        Plasmoid.configuration.taskGroups = json;
+        Plasmoid.configuration.taskSections = json;
         if (_activeSyncGroup) {
             TaskTools.updateSyncGroupLayout(_activeSyncGroup, json, _syncInstanceId);
             _persistSyncGroupLayout(_activeSyncGroup, json);
         }
     }
 
-    function moveAppToGroup(appId, fromLayoutIdx, toLayoutIdx) {
+    function moveAppToSection(appId, fromLayoutIdx, toLayoutIdx) {
         var items = parsedLayout.slice();
-        // Remove from old group
-        if (fromLayoutIdx >= 0 && fromLayoutIdx < items.length && items[fromLayoutIdx].type === "group") {
+        // Remove from old section
+        if (fromLayoutIdx >= 0 && fromLayoutIdx < items.length && items[fromLayoutIdx].type === "section") {
             items[fromLayoutIdx] = Object.assign({}, items[fromLayoutIdx]);
             items[fromLayoutIdx].appIds = (items[fromLayoutIdx].appIds || []).filter(function(id) { return id !== appId; });
         }
-        // Add to new group (unless it's ungrouped)
-        if (toLayoutIdx >= 0 && toLayoutIdx < items.length && items[toLayoutIdx].type === "group" && items[toLayoutIdx].name !== "__ungrouped") {
+        // Add to new section (unless it's unsectioned)
+        if (toLayoutIdx >= 0 && toLayoutIdx < items.length && items[toLayoutIdx].type === "section" && items[toLayoutIdx].name !== "__unsectioned") {
             items[toLayoutIdx] = Object.assign({}, items[toLayoutIdx]);
             var ids = (items[toLayoutIdx].appIds || []).slice();
             if (ids.indexOf(appId) < 0) ids.push(appId);
@@ -324,30 +324,30 @@ PlasmoidItem {
         _saveLayout(items);
     }
 
-    function addAppToNewGroup(appId, fromLayoutIdx, groupName) {
-        var name = (groupName && groupName.trim() !== "") ? groupName.trim() : "New Group";
+    function addAppToNewSection(appId, fromLayoutIdx, sectionName) {
+        var name = (sectionName && sectionName.trim() !== "") ? sectionName.trim() : "New Section";
         var items = parsedLayout.slice();
-        // Remove from old group
-        if (fromLayoutIdx >= 0 && fromLayoutIdx < items.length && items[fromLayoutIdx].type === "group") {
+        // Remove from old section
+        if (fromLayoutIdx >= 0 && fromLayoutIdx < items.length && items[fromLayoutIdx].type === "section") {
             items[fromLayoutIdx] = Object.assign({}, items[fromLayoutIdx]);
             items[fromLayoutIdx].appIds = (items[fromLayoutIdx].appIds || []).filter(function(id) { return id !== appId; });
         }
-        // Find ungrouped index to insert before it
+        // Find unsectioned index to insert before it
         var insertIdx = items.length;
         for (var i = 0; i < items.length; i++) {
-            if (items[i].type === "group" && items[i].name === "__ungrouped") {
+            if (items[i].type === "section" && items[i].name === "__unsectioned") {
                 insertIdx = i;
                 break;
             }
         }
-        items.splice(insertIdx, 0, {type: "group", name: name, appIds: [appId], color: ""});
+        items.splice(insertIdx, 0, {type: "section", name: name, appIds: [appId], color: ""});
         _saveLayout(items);
     }
 
-    function addGroupAt(layoutIndex, groupName) {
-        var name = (groupName && groupName.trim() !== "") ? groupName.trim() : "New Group";
+    function addSectionAt(layoutIndex, sectionName) {
+        var name = (sectionName && sectionName.trim() !== "") ? sectionName.trim() : "New Section";
         var items = parsedLayout.slice();
-        items.splice(layoutIndex, 0, {type: "group", name: name, appIds: [], color: ""});
+        items.splice(layoutIndex, 0, {type: "section", name: name, appIds: [], color: ""});
         _saveLayout(items);
     }
 
@@ -381,16 +381,16 @@ PlasmoidItem {
         return (isNaN(px) || px < 1) ? 8 : Math.round(px);
     }
 
-    function renameGroup(layoutIndex, newName) {
+    function renameSection(layoutIndex, newName) {
         var items = parsedLayout.slice();
-        if (layoutIndex >= 0 && layoutIndex < items.length && items[layoutIndex].type === "group") {
+        if (layoutIndex >= 0 && layoutIndex < items.length && items[layoutIndex].type === "section") {
             items[layoutIndex] = Object.assign({}, items[layoutIndex]);
             items[layoutIndex].name = (newName && newName.trim() !== "") ? newName.trim() : items[layoutIndex].name;
             _saveLayout(items);
         }
     }
 
-    function setGroupFloat(layoutIndex, floatValue) {
+    function setSectionFloat(layoutIndex, floatValue) {
         var items = parsedLayout.slice();
         if (layoutIndex >= 0 && layoutIndex < items.length) {
             items[layoutIndex] = Object.assign({}, items[layoutIndex]);
@@ -402,7 +402,7 @@ PlasmoidItem {
     function removeLayoutItem(layoutIndex) {
         var items = parsedLayout.slice();
         if (layoutIndex >= 0 && layoutIndex < items.length) {
-            // If removing a group, its apps become ungrouped (just remove the group entry)
+            // If removing a section, its apps become unsectioned (just remove the section entry)
             items.splice(layoutIndex, 1);
         }
         _saveLayout(items);
@@ -427,16 +427,16 @@ PlasmoidItem {
         }
     }
 
-    // In grouped mode, always fill (float handles spacing); otherwise use config
-    readonly property bool effectiveFill: groupedMode ? true : Plasmoid.configuration.fill
+    // In sectioned mode, always fill (float handles spacing); otherwise use config
+    readonly property bool effectiveFill: sectionedMode ? true : Plasmoid.configuration.fill
     Layout.fillWidth: vertical ? true : effectiveFill
     Layout.fillHeight: !vertical ? true : effectiveFill
     Layout.minimumWidth: {
         if (shouldShrinkToZero) {
             return Kirigami.Units.gridUnit; // For edit mode
         }
-        if (groupedMode && !vertical) {
-            return groupedLayout.implicitWidth;
+        if (sectionedMode && !vertical) {
+            return sectionedLayout.implicitWidth;
         }
         return vertical ? 0 : LayoutMetrics.preferredMinWidth();
     }
@@ -444,8 +444,8 @@ PlasmoidItem {
         if (shouldShrinkToZero) {
             return Kirigami.Units.gridUnit; // For edit mode
         }
-        if (groupedMode && vertical) {
-            return groupedLayout.implicitHeight;
+        if (sectionedMode && vertical) {
+            return sectionedLayout.implicitHeight;
         }
         return !vertical ? 0 : LayoutMetrics.preferredMinHeight();
     }
@@ -458,8 +458,8 @@ PlasmoidItem {
         if (vertical) {
             return Kirigami.Units.gridUnit * 10;
         }
-        if (groupedMode) {
-            return groupedLayout.implicitWidth;
+        if (sectionedMode) {
+            return sectionedLayout.implicitWidth;
         }
         return taskList.Layout.maximumWidth
     }
@@ -468,8 +468,8 @@ PlasmoidItem {
             return 0.01;
         }
         if (vertical) {
-            if (groupedMode) {
-                return groupedLayout.implicitHeight;
+            if (sectionedMode) {
+                return sectionedLayout.implicitHeight;
             }
             return taskList.Layout.maximumHeight
         }
@@ -827,12 +827,12 @@ PlasmoidItem {
                 top: parent.top
             }
 
-            height: tasks.groupedMode ? groupedLayout.height : taskList.height
-            width: tasks.groupedMode ? groupedLayout.width : taskList.width
+            height: tasks.sectionedMode ? sectionedLayout.height : taskList.height
+            width: tasks.sectionedMode ? sectionedLayout.width : taskList.width
 
             TaskList {
                 id: taskList
-                visible: !tasks.groupedMode
+                visible: !tasks.sectionedMode
 
                 LayoutMirroring.enabled: tasks.shouldBeMirrored(Plasmoid.configuration.reverseMode, Qt.application.layoutDirection, vertical)
                 anchors {
@@ -910,16 +910,16 @@ PlasmoidItem {
                         taskClosedWithMouseMiddleButton = [];
                     }
                     onItemAdded: (index, item) => {
-                        if (tasks.groupedMode && item) {
-                            groupedLayout.reparentTask(item);
+                        if (tasks.sectionedMode && item) {
+                            sectionedLayout.reparentTask(item);
                         }
                     }
                 }
             }
 
-            GroupedTaskLayout {
-                id: groupedLayout
-                visible: tasks.groupedMode
+            SectionedTaskLayout {
+                id: sectionedLayout
+                visible: tasks.sectionedMode
                 layoutItems: tasks.parsedLayout
                 anchors {
                     left: parent.left
@@ -987,16 +987,16 @@ PlasmoidItem {
         TaskTools.taskManagerInstanceCount += 1;
         requestLayout.connect(iconGeometryTimer.restart);
 
-        // Initialize layout if no groups are configured yet
-        var tg = Plasmoid.configuration.taskGroups;
+        // Initialize layout if no sections are configured yet
+        var tg = Plasmoid.configuration.taskSections;
         if (!tg || tg.trim() === "" || tg.trim() === "[]") {
-            Plasmoid.configuration.taskGroups = JSON.stringify([
-                {type: "group", name: "__ungrouped", appIds: [], color: ""}
+            Plasmoid.configuration.taskSections = JSON.stringify([
+                {type: "section", name: "__unsectioned", appIds: [], color: ""}
             ]);
         }
 
         // Set initial live state and join sync group
-        _liveLayoutJson = Plasmoid.configuration.taskGroups;
+        _liveLayoutJson = Plasmoid.configuration.taskSections;
         _joinSyncGroup();
 
         // Init exclusive mode claims
