@@ -37,18 +37,6 @@ function maxStripes() {
     return Math.min(tasks.plasmoid.configuration.maxStripes, Math.max(1, Math.floor(length / minimum)));
 }
 
-function optimumCapacity(width, height) {
-    const length = tasks.vertical ? height : width;
-    const maximum = tasks.vertical ? preferredMaxHeight() : preferredMaxWidth();
-
-    if (!tasks.vertical) {
-        //  Fit more tasks in this case, that is possible to cut text, before combining tasks.
-        return Math.ceil(length / maximum) * maxStripes() + 1;
-    }
-
-    return Math.floor(length / maximum) * maxStripes();
-}
-
 function preferredMinWidth() {
     return preferredMinLauncherWidth();
 }
@@ -67,9 +55,7 @@ function preferredMinHeight() {
 
 function preferredMaxHeight() {
     if (tasks.vertical) {
-        var taskPreferredSize = tasks.width / maxStripes();
-        return verticalMargins() +
-            Math.min(tasks.width / maxStripes(), taskPreferredSize);
+        return verticalMargins() + tasks.width / maxStripes();
     }
     return verticalMargins() +
         Math.min(Kirigami.Units.iconSizes.small * 3,

@@ -448,7 +448,6 @@ PlasmoidItem {
         return !vertical ? 0 : LayoutMetrics.preferredMinHeight();
     }
 
-//BEGIN TODO: this is not precise enough: launchers are smaller than full tasks
     Layout.preferredWidth: {
         if (shouldShrinkToZero) {
             return 0.01;
@@ -473,8 +472,6 @@ PlasmoidItem {
         }
         return Kirigami.Units.gridUnit * 2;
     }
-//END TODO
-
     property Item dragSource
 
     signal requestLayout
@@ -734,7 +731,6 @@ PlasmoidItem {
             PlasmaComponents3.BusyIndicator {}
         }
 
-        // Save drag data
         Item {
             id: dragHelper
 

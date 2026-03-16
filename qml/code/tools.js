@@ -122,7 +122,7 @@ function activateNextPrevTask(anchor, next, wheelSkipMinimized, wheelEnabled, ta
             return;
         }
 
-        // Single window`
+        // Single window
         if (windowCount === 1) {
             const isHidden = tasks.tasksModel.data(anchorModelIndex, TaskManager.AbstractTasksModel.IsHidden);
             if (!wheelSkipMinimized || !isHidden) {

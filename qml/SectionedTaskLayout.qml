@@ -14,7 +14,6 @@ Item {
     id: sectionedLayout
 
     property var layoutItems: []
-    property bool animating: false
     property int dropTargetSectionIndex: -1
     property int dropInsertIndex: -1
 
@@ -38,9 +37,6 @@ Item {
         }
         return arr;
     }
-
-    // Whether we have any right-floated items (controls fill visibility)
-    readonly property bool hasRightItems: rightItems.length > 0
 
     implicitWidth: tasks.vertical ? sectionColumn.implicitWidth : sectionRow.implicitWidth
     implicitHeight: tasks.vertical ? sectionColumn.implicitHeight : sectionRow.implicitHeight
