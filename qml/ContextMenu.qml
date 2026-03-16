@@ -823,11 +823,11 @@ PlasmaExtras.Menu {
 
         visible: {
             if (!tasks.sectionedMode || !visualParent || get(atm.IsLauncher) || get(atm.IsStartup)) return false;
-            var gIdx = visualParent.sectionIndex;
-            if (gIdx < 0) return false;
+            var sectionIdx = visualParent.sectionIndex;
+            if (sectionIdx < 0) return false;
             var layout = tasks.parsedLayout;
-            if (gIdx >= layout.length) return false;
-            return layout[gIdx].type === "section" && layout[gIdx].name !== "__unsectioned";
+            if (sectionIdx >= layout.length) return false;
+            return layout[sectionIdx].type === "section" && layout[sectionIdx].name !== "__unsectioned";
         }
 
         text: i18n("Remove from Section")
@@ -859,10 +859,10 @@ PlasmaExtras.Menu {
 
         text: {
             if (!visible || !visualParent) return "";
-            var gIdx = visualParent.sectionIndex;
+            var sectionIdx = visualParent.sectionIndex;
             var layout = tasks.parsedLayout;
-            if (gIdx >= 0 && gIdx < layout.length && layout[gIdx].type === "section") {
-                var name = layout[gIdx].name;
+            if (sectionIdx >= 0 && sectionIdx < layout.length && layout[sectionIdx].type === "section") {
+                var name = layout[sectionIdx].name;
                 var displayName = (name === "__unsectioned") ? i18n("Unsectioned") : name;
                 return i18n("Add Spacer Before \"%1\"", displayName);
             }

@@ -65,40 +65,30 @@ function leaveSyncGroup(name, instanceId) {
     _notifySyncGroupChange();
 }
 
-// Update layout and broadcast to all subscribers except the sender.
+// Generic sync group broadcast: update a property and notify all subscribers except the sender.
+// propertyKey: "layoutJson" | "launchersJson" | "groupingBlacklistJson"
+// callbackKey: "onLayoutChanged" | "onLaunchersChanged" | "onGroupingBlacklistChanged"
+function _broadcastSyncGroupUpdate(name, propertyKey, callbackKey, newJson, senderId) {
+    if (!name || !_syncGroups[name]) return;
+    _syncGroups[name][propertyKey] = newJson;
+    var subs = _syncGroups[name].subscribers;
+    for (var i = 0; i < subs.length; i++) {
+        if (subs[i].id !== senderId) {
+            subs[i][callbackKey](newJson);
+        }
+    }
+}
+
 function updateSyncGroupLayout(name, newLayoutJson, senderId) {
-    if (!name || !_syncGroups[name]) return;
-    _syncGroups[name].layoutJson = newLayoutJson;
-    var subs = _syncGroups[name].subscribers;
-    for (var i = 0; i < subs.length; i++) {
-        if (subs[i].id !== senderId) {
-            subs[i].onLayoutChanged(newLayoutJson);
-        }
-    }
+    _broadcastSyncGroupUpdate(name, "layoutJson", "onLayoutChanged", newLayoutJson, senderId);
 }
 
-// Update launchers and broadcast to all subscribers except the sender.
 function updateSyncGroupLaunchers(name, newLaunchersJson, senderId) {
-    if (!name || !_syncGroups[name]) return;
-    _syncGroups[name].launchersJson = newLaunchersJson;
-    var subs = _syncGroups[name].subscribers;
-    for (var i = 0; i < subs.length; i++) {
-        if (subs[i].id !== senderId) {
-            subs[i].onLaunchersChanged(newLaunchersJson);
-        }
-    }
+    _broadcastSyncGroupUpdate(name, "launchersJson", "onLaunchersChanged", newLaunchersJson, senderId);
 }
 
-// Update grouping blacklist and broadcast to all subscribers except the sender.
 function updateSyncGroupGroupingBlacklist(name, newJson, senderId) {
-    if (!name || !_syncGroups[name]) return;
-    _syncGroups[name].groupingBlacklistJson = newJson;
-    var subs = _syncGroups[name].subscribers;
-    for (var i = 0; i < subs.length; i++) {
-        if (subs[i].id !== senderId) {
-            subs[i].onGroupingBlacklistChanged(newJson);
-        }
-    }
+    _broadcastSyncGroupUpdate(name, "groupingBlacklistJson", "onGroupingBlacklistChanged", newJson, senderId);
 }
 
 function addSyncGroupChangeListener(cb) {

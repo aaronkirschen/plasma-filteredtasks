@@ -38,6 +38,7 @@ plasma_add_applet(org.kde.plasma.filteredtasks
         qml/ConfigSections.qml
         qml/ContextMenu.qml
         qml/GroupDialog.qml
+        qml/SectionDelegate.qml
         qml/SectionedTaskLayout.qml
         qml/GroupExpanderOverlay.qml
         qml/SectionMenu.qml
