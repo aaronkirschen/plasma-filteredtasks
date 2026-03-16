@@ -25,27 +25,8 @@ PlasmaExtras.Menu {
     required property Mpris.Mpris2Model mpris2Source
     required property /*QModelIndex*/var modelIndex
 
-    // AbstractTasksModel.AdditionalRoles - hardcoded from Qt::UserRole+1 (257)
-    // because storing the QML type in a var loses enum access in compiled QML.
-    readonly property var atm: ({
-        AppId: 257, AppName: 258, GenericName: 259,
-        LauncherUrl: 260, LauncherUrlWithoutIcon: 261, WinIdList: 262,
-        MimeType: 263, MimeData: 264, IsWindow: 265,
-        IsStartup: 266, IsLauncher: 267, HasLauncher: 268,
-        IsGroupParent: 269, ChildCount: 270, IsGroupable: 271,
-        IsActive: 272, IsClosable: 273, IsMovable: 274,
-        IsResizable: 275, IsMaximizable: 276, IsMaximized: 277,
-        IsMinimizable: 278, IsMinimized: 279, IsKeepAbove: 280,
-        IsKeepBelow: 281, IsFullScreenable: 282, IsFullScreen: 283,
-        IsShadeable: 284, IsShaded: 285, IsVirtualDesktopsChangeable: 286,
-        VirtualDesktops: 287, IsOnAllVirtualDesktops: 288,
-        Geometry: 289, ScreenGeometry: 290, Activities: 291,
-        IsDemandingAttention: 292, SkipTaskbar: 293, SkipPager: 294,
-        AppPid: 295, StackingOrder: 296, LastActivated: 297,
-        ApplicationMenuServiceName: 298, ApplicationMenuObjectPath: 299,
-        IsHidden: 300, CanLaunchNewInstance: 301,
-        HasNoBorder: 302, CanSetNoBorder: 303
-    })
+    // Shorthand alias for AbstractTasksModel role enum
+    readonly property var atm: TaskManager.AbstractTasksModel
 
     property bool showAllPlaces: false
 
