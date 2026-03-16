@@ -22,9 +22,9 @@ KCMUtils.SimpleKCM {
     property int cfg_groupingStrategyDefault
     property alias cfg_groupedTaskVisualization: groupedTaskVisualization.currentIndex
     property int cfg_groupedTaskVisualizationDefault
-    property alias cfg_groupPopups: groupPopups.checked
+    property bool cfg_groupPopups
     property bool cfg_groupPopupsDefault
-    property alias cfg_onlyGroupWhenFull: onlyGroupWhenFull.checked
+    property bool cfg_onlyGroupWhenFull
     property bool cfg_onlyGroupWhenFullDefault
     property var cfg_groupingAppIdBlacklist
     property var cfg_groupingAppIdBlacklistDefault
@@ -32,9 +32,9 @@ KCMUtils.SimpleKCM {
     property var cfg_groupingLauncherUrlBlacklistDefault
     property int cfg_sortingStrategy
     property int cfg_sortingStrategyDefault
-    property alias cfg_separateLaunchers: separateLaunchers.checked
+    property bool cfg_separateLaunchers
     property bool cfg_separateLaunchersDefault
-    property alias cfg_hideLauncherOnStart: hideLauncherOnStart.checked
+    property bool cfg_hideLauncherOnStart
     property bool cfg_hideLauncherOnStartDefault
     property alias cfg_middleClickAction: middleClickAction.currentIndex
     property int cfg_middleClickActionDefault
@@ -158,29 +158,9 @@ KCMUtils.SimpleKCM {
         }
 
         QQC2.CheckBox {
-            id: groupPopups
-            visible: (Plasmoid.pluginName !== "org.kde.plasma.icontasks" && Plasmoid.pluginName !== "org.kde.plasma.filteredtasks")
-            text: i18nc("@option:check grouped task", "Combine into single button")
-            enabled: groupingStrategy.currentIndex > 0
-        }
-
-        QQC2.CheckBox {
-            id: onlyGroupWhenFull
-            visible: (Plasmoid.pluginName !== "org.kde.plasma.icontasks" && Plasmoid.pluginName !== "org.kde.plasma.filteredtasks")
-            text: i18nc("@option:check grouped task","Group only when the Task Manager is full")
-            enabled: groupingStrategy.currentIndex > 0 && groupPopups.checked
-            Accessible.onPressAction: toggle()
-        }
-
-        QQC2.CheckBox {
             id: syncGroupingBlacklist
             text: i18nc("@option:check grouped task", "Sync per-app grouping across synced widgets")
             enabled: groupingStrategy.currentIndex > 0
-        }
-
-        Item {
-            Kirigami.FormData.isSection: true
-            visible: (Plasmoid.pluginName !== "org.kde.plasma.icontasks" && Plasmoid.pluginName !== "org.kde.plasma.filteredtasks")
         }
 
         QQC2.ComboBox {
@@ -218,24 +198,6 @@ KCMUtils.SimpleKCM {
             ]
             onActivated: cfg_sortingStrategy = currentValue
             Component.onCompleted: currentIndex = indexOfValue(cfg_sortingStrategy)
-        }
-
-        QQC2.CheckBox {
-            id: separateLaunchers
-            visible: (Plasmoid.pluginName !== "org.kde.plasma.icontasks" && Plasmoid.pluginName !== "org.kde.plasma.filteredtasks")
-            text: i18nc("@option:check configure task sorting", "Keep launchers separate")
-            enabled: sortingStrategy.currentValue === TaskManager.TasksModel.SortManual
-        }
-
-        QQC2.CheckBox {
-            id: hideLauncherOnStart
-            visible: (Plasmoid.pluginName !== "org.kde.plasma.icontasks" && Plasmoid.pluginName !== "org.kde.plasma.filteredtasks")
-            text: i18nc("@option:check for icons-and-text task manager", "Hide launchers after application startup")
-        }
-
-        Item {
-            Kirigami.FormData.isSection: true
-            visible: (Plasmoid.pluginName !== "org.kde.plasma.icontasks" && Plasmoid.pluginName !== "org.kde.plasma.filteredtasks")
         }
 
         QQC2.CheckBox {

@@ -44,9 +44,7 @@ PlasmaCore.ToolTipArea {
 
     Layout.fillWidth: true
     Layout.fillHeight: !inPopup
-    Layout.maximumWidth: tasksRoot.vertical
-        ? -1
-        : ((model.IsLauncher && !tasks.iconsOnly) ? tasksRoot.height / taskList.rows : LayoutMetrics.preferredMaxWidth())
+    Layout.maximumWidth: tasksRoot.vertical ? -1 : LayoutMetrics.preferredMaxWidth()
     Layout.maximumHeight: tasksRoot.vertical ? LayoutMetrics.preferredMaxHeight() : -1
 
     required property var model

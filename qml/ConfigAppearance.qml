@@ -17,7 +17,6 @@ import org.kde.plasma.plasmoid
 KCMUtils.SimpleKCM {
     readonly property bool plasmaPaAvailable: Qt.createComponent("PulseAudio.qml").status === Component.Ready
     readonly property bool plasmoidVertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
-    readonly property bool iconOnly: Plasmoid.pluginName === "org.kde.plasma.icontasks" || Plasmoid.pluginName === "org.kde.plasma.filteredtasks"
 
     property alias cfg_showToolTips: showToolTips.checked
     property bool cfg_showToolTipsDefault
@@ -29,13 +28,13 @@ KCMUtils.SimpleKCM {
     property bool cfg_interactiveMuteDefault
     property bool cfg_tooltipControls
     property bool cfg_tooltipControlsDefault
-    property alias cfg_fill: fill.checked
+    property bool cfg_fill
     property bool cfg_fillDefault
     property alias cfg_maxStripes: maxStripes.value
     property int cfg_maxStripesDefault
     property alias cfg_forceStripes: forceStripes.checked
     property bool cfg_forceStripesDefault
-    property alias cfg_taskMaxWidth: taskMaxWidth.currentIndex
+    property int cfg_taskMaxWidth
     property int cfg_taskMaxWidthDefault
     property int cfg_iconSpacing: 0
     property int cfg_iconSpacingDefault
@@ -144,31 +143,6 @@ KCMUtils.SimpleKCM {
             enabled: plasmaPaAvailable
         }
 
-        QQC2.CheckBox {
-            id: fill
-            visible: !iconOnly
-            text: i18nc("@option:check section General", "Fill free space on panel")
-        }
-
-
-        Item {
-            Kirigami.FormData.isSection: true
-            visible: !iconOnly
-        }
-
-        QQC2.ComboBox {
-            id: taskMaxWidth
-            visible: !iconOnly && !plasmoidVertical
-
-            Kirigami.FormData.label: i18nc("@label:listbox", "Maximum task width:")
-
-            model: [
-                i18nc("@item:inlistbox how wide a task item should be", "Narrow"),
-                i18nc("@item:inlistbox how wide a task item should be", "Medium"),
-                i18nc("@item:inlistbox how wide a task item should be", "Wide")
-            ]
-        }
-
         Item {
             Kirigami.FormData.isSection: true
         }
@@ -220,7 +194,6 @@ KCMUtils.SimpleKCM {
         }
 
         QQC2.ComboBox {
-            visible: iconOnly
             Kirigami.FormData.label: i18nc("@label:listbox", "Spacing between icons:")
 
             model: [

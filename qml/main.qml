@@ -37,8 +37,7 @@ PlasmoidItem {
 
     readonly property bool shouldShrinkToZero: tasksModel.count === 0
     readonly property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
-    readonly property bool iconsOnly: Plasmoid.pluginName === "org.kde.plasma.icontasks"
-        || Plasmoid.pluginName === "org.kde.plasma.filteredtasks"
+    readonly property bool iconsOnly: true
 
     property Task toolTipOpenedByClick
     property Task toolTipAreaItem
@@ -413,7 +412,6 @@ PlasmoidItem {
     readonly property Component contextMenuComponent: Qt.createComponent("ContextMenu.qml")
     readonly property Component pulseAudioComponent: Qt.createComponent("PulseAudio.qml")
 
-    property bool needLayoutRefresh: false
     property /*list<WId> where WId = int|string*/ var taskClosedWithMouseMiddleButton: []
     property alias taskList: taskList
 
@@ -552,22 +550,14 @@ PlasmoidItem {
         filterByActivity: Plasmoid.configuration.showOnlyCurrentActivity
         filterNotMinimized: Plasmoid.configuration.showOnlyMinimized
 
-        hideActivatedLaunchers: tasks.iconsOnly || Plasmoid.configuration.hideLauncherOnStart
+        hideActivatedLaunchers: true
         sortMode: sortModeEnumValue(Plasmoid.configuration.sortingStrategy)
-        launchInPlace: tasks.iconsOnly && Plasmoid.configuration.sortingStrategy === 1
-        separateLaunchers: {
-            if (!tasks.iconsOnly && !Plasmoid.configuration.separateLaunchers
-                && Plasmoid.configuration.sortingStrategy === 1) {
-                return false;
-            }
-
-            return true;
-        }
+        launchInPlace: Plasmoid.configuration.sortingStrategy === 1
+        separateLaunchers: true
 
         groupMode: groupModeEnumValue(Plasmoid.configuration.groupingStrategy)
-        groupInline: !Plasmoid.configuration.groupPopups && !tasks.iconsOnly
-        groupingWindowTasksThreshold: (Plasmoid.configuration.onlyGroupWhenFull && !tasks.iconsOnly
-            ? LayoutMetrics.optimumCapacity(width, height) + 1 : -1)
+        groupInline: false
+        groupingWindowTasksThreshold: -1
 
         onLauncherListChanged: {
             Plasmoid.configuration.launchers = launcherList;
@@ -902,11 +892,6 @@ PlasmoidItem {
                         tasksRoot: tasks
                     }
                     onItemRemoved: (index, item) => {
-                        if (tasks.containsMouse && index !== taskRepeater.count &&
-                            item.model.WinIdList.length > 0 &&
-                            taskClosedWithMouseMiddleButton.includes(item.winIdList[0])) {
-                            needLayoutRefresh = true;
-                        }
                         taskClosedWithMouseMiddleButton = [];
                     }
                     onItemAdded: (index, item) => {

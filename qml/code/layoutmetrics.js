@@ -11,12 +11,12 @@ const iconMargin = Math.round(Kirigami.Units.smallSpacing / 4);
 const labelMargin = Kirigami.Units.smallSpacing;
 
 function horizontalMargins() {
-    const spacingAdjustment = (tasks.plasmoid.pluginName === "org.kde.plasma.icontasks" || tasks.plasmoid.pluginName === "org.kde.plasma.filteredtasks") ? (Kirigami.Settings.tabletMode ? 3 : tasks.plasmoid.configuration.iconSpacing) : 1
+    const spacingAdjustment = Kirigami.Settings.tabletMode ? 3 : tasks.plasmoid.configuration.iconSpacing;
     return (taskFrame.margins.left + taskFrame.margins.right) * (tasks.vertical ? 1 : spacingAdjustment);
 }
 
 function verticalMargins() {
-    const spacingAdjustment = (tasks.plasmoid.pluginName === "org.kde.plasma.icontasks" || tasks.plasmoid.pluginName === "org.kde.plasma.filteredtasks") ? (Kirigami.Settings.tabletMode ? 3 : tasks.plasmoid.configuration.iconSpacing) : 1
+    const spacingAdjustment = Kirigami.Settings.tabletMode ? 3 : tasks.plasmoid.configuration.iconSpacing;
     return (taskFrame.margins.top + taskFrame.margins.bottom) * (tasks.vertical ? spacingAdjustment : 1);
 }
 
@@ -50,66 +50,14 @@ function optimumCapacity(width, height) {
 }
 
 function preferredMinWidth() {
-    let width = preferredMinLauncherWidth();
-
-    if (!tasks.vertical && !tasks.iconsOnly) {
-      width +=
-          (Kirigami.Units.smallSpacing * 2) +
-          (Kirigami.Units.gridUnit * 8);
-    }
-
-    return width;
+    return preferredMinLauncherWidth();
 }
 
 function preferredMaxWidth() {
-    if (tasks.iconsOnly) {
-        if (tasks.vertical) {
-            if (tasks.width === 0) {
-                return 0
-            }
-            return tasks.width + verticalMargins();
-        } else {
-            if (tasks.height === 0) {
-                return 0
-            }
-            return tasks.height + horizontalMargins();
-        }
-    }
-
-    // Avoid doing a bunch of unnecessary work below in vertical mode
     if (tasks.vertical) {
-        return preferredMinWidth();
+        return tasks.width === 0 ? 0 : tasks.width + verticalMargins();
     }
-
-    // Visually, a large max item width on a tall panel looks cluttered even
-    // with just a task or two open. This clutter is less pronounced on panels
-    // lower in height, as there is generally more horizontal space.
-    //
-    // This allows for one default value for max item width where clutter is
-    // reduced at low task counts for tall panels, while leaving low height
-    // panels less affected (unaffected at 20px).
-    const laneHeight = tasks.height / maxStripes(); // correct for multiple rows
-    let baseFactor = 1; // sane default in case something goes wrong
-    switch (tasks.plasmoid.configuration.taskMaxWidth) {
-    case 0: // narrow
-        baseFactor = 1.2;
-        break;
-    case 1: // medium
-        baseFactor = 1.6;
-        break;
-    case 2: // wide
-        baseFactor = 2;
-        break;
-    }
-    // For every pixel of height above 20, knock the factor down by 0.01. This
-    // produces nice results for 20~50 pixels. Above 50, it suddenly feels like
-    // it's shrinking a lot, and above 80 the Medium and Narrow settings would
-    // end up setting the same width, so don't apply further reduction above 50.
-    const factorReduction = (Math.min(50, laneHeight) - 20) * 0.01;
-    // Clamp the minimum factor to 1 to ensure max width is always >= min width.
-    // and the factor reduction to 0 so we don't ever increase the factor
-    const factor = Math.max(1, baseFactor - Math.max(0, factorReduction));
-    return Math.floor(preferredMinWidth() * factor);
+    return tasks.height === 0 ? 0 : tasks.height + horizontalMargins();
 }
 
 function preferredMinHeight() {
@@ -119,25 +67,13 @@ function preferredMinHeight() {
 
 function preferredMaxHeight() {
     if (tasks.vertical) {
-        let taskPreferredSize = 0;
-        if (tasks.iconsOnly) {
-            taskPreferredSize = tasks.width / maxStripes();
-        } else {
-            taskPreferredSize = Math.max(Kirigami.Units.iconSizes.sizeForLabels,
-                                         Kirigami.Units.iconSizes.medium);
-        }
+        var taskPreferredSize = tasks.width / maxStripes();
         return verticalMargins() +
-            Math.min(
-                // Do not allow the preferred icon size to exceed the width of
-                // the vertical task manager.
-                tasks.width / maxStripes(),
-                taskPreferredSize);
-    } else {
-        return verticalMargins() +
-            Math.min(
-                Kirigami.Units.iconSizes.small * 3,
-                Kirigami.Units.iconSizes.sizeForLabels * 3);
+            Math.min(tasks.width / maxStripes(), taskPreferredSize);
     }
+    return verticalMargins() +
+        Math.min(Kirigami.Units.iconSizes.small * 3,
+                 Kirigami.Units.iconSizes.sizeForLabels * 3);
 }
 
 function preferredHeightInPopup() {
