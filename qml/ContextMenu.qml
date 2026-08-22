@@ -786,7 +786,7 @@ PlasmaExtras.Menu {
                     if (layout[i].type !== "section") continue;
                     if (i === currentIdx) continue;
                     var name = layout[i].name;
-                    var displayName = (name === "__unsectioned") ? i18n("Unsectioned") : name;
+                    var displayName = name;
                     var menuItem = menu.newMenuItem(moveToSectionMenu);
                     menuItem.text = displayName;
                     menuItem.clicked.connect((function(aid, from, to, root) {
@@ -829,7 +829,7 @@ PlasmaExtras.Menu {
             if (sectionIdx < 0) return false;
             var layout = tasks.parsedLayout;
             if (sectionIdx >= layout.length) return false;
-            return layout[sectionIdx].type === "section" && layout[sectionIdx].name !== "__unsectioned";
+            return layout[sectionIdx].type === "section" && !layout[sectionIdx].catchAll;
         }
 
         text: i18n("Remove from Section")
@@ -838,17 +838,16 @@ PlasmaExtras.Menu {
         onClicked: {
             var appId = visualParent.appId;
             var fromIdx = visualParent.sectionIndex;
-            // Find unsectioned index
             var layout = tasks.parsedLayout;
-            var unsectionedIdx = -1;
+            var catchAllIdx = -1;
             for (var i = 0; i < layout.length; i++) {
-                if (layout[i].type === "section" && layout[i].name === "__unsectioned") {
-                    unsectionedIdx = i;
+                if (layout[i].type === "section" && layout[i].catchAll) {
+                    catchAllIdx = i;
                     break;
                 }
             }
-            if (unsectionedIdx >= 0) {
-                tasks.moveAppToSection(appId, fromIdx, unsectionedIdx);
+            if (catchAllIdx >= 0) {
+                tasks.moveAppToSection(appId, fromIdx, catchAllIdx);
             }
         }
     }
@@ -864,9 +863,7 @@ PlasmaExtras.Menu {
             var sectionIdx = visualParent.sectionIndex;
             var layout = tasks.parsedLayout;
             if (sectionIdx >= 0 && sectionIdx < layout.length && layout[sectionIdx].type === "section") {
-                var name = layout[sectionIdx].name;
-                var displayName = (name === "__unsectioned") ? i18n("Unsectioned") : name;
-                return i18n("Add Spacer Before \"%1\"", displayName);
+                return i18n("Add Spacer Before \"%1\"", layout[sectionIdx].name);
             }
             return i18n("Add Spacer Before Section");
         }

@@ -69,7 +69,7 @@ PlasmoidItem {
         var ids = [];
         for (var i = 0; i < parsedLayout.length; i++) {
             var item = parsedLayout[i];
-            if (item.type !== "section" || item.name === "__unsectioned") continue;
+            if (item.type !== "section" || item.catchAll) continue;
             var appIds = item.appIds || [];
             for (var j = 0; j < appIds.length; j++) {
                 ids.push(appIds[j]);
@@ -313,8 +313,7 @@ PlasmoidItem {
             items[fromLayoutIdx] = Object.assign({}, items[fromLayoutIdx]);
             items[fromLayoutIdx].appIds = (items[fromLayoutIdx].appIds || []).filter(function(id) { return id !== appId; });
         }
-        // Add to new section (unless it's unsectioned)
-        if (toLayoutIdx >= 0 && toLayoutIdx < items.length && items[toLayoutIdx].type === "section" && items[toLayoutIdx].name !== "__unsectioned") {
+        if (toLayoutIdx >= 0 && toLayoutIdx < items.length && items[toLayoutIdx].type === "section") {
             items[toLayoutIdx] = Object.assign({}, items[toLayoutIdx]);
             var ids = (items[toLayoutIdx].appIds || []).slice();
             if (ids.indexOf(appId) < 0) ids.push(appId);
@@ -331,10 +330,10 @@ PlasmoidItem {
             items[fromLayoutIdx] = Object.assign({}, items[fromLayoutIdx]);
             items[fromLayoutIdx].appIds = (items[fromLayoutIdx].appIds || []).filter(function(id) { return id !== appId; });
         }
-        // Find unsectioned index to insert before it
+        // Insert before the catchAll section if one exists
         var insertIdx = items.length;
         for (var i = 0; i < items.length; i++) {
-            if (items[i].type === "section" && items[i].name === "__unsectioned") {
+            if (items[i].type === "section" && items[i].catchAll) {
                 insertIdx = i;
                 break;
             }
@@ -968,11 +967,18 @@ PlasmoidItem {
         TaskTools.taskManagerInstanceCount += 1;
         requestLayout.connect(iconGeometryTimer.restart);
 
-        // Initialize layout if no sections are configured yet
+        // Initialize layout, resetting if empty or using old __unsectioned schema
         var tg = Plasmoid.configuration.taskSections;
-        if (!tg || tg.trim() === "" || tg.trim() === "[]") {
+        var needsReset = !tg || tg.trim() === "" || tg.trim() === "[]";
+        if (!needsReset) {
+            try {
+                var p = JSON.parse(tg);
+                if (p.some(function(i) { return i.name === "__unsectioned"; })) needsReset = true;
+            } catch(e) { needsReset = true; }
+        }
+        if (needsReset) {
             Plasmoid.configuration.taskSections = JSON.stringify([
-                {type: "section", name: "__unsectioned", appIds: [], color: ""}
+                {type: "section", name: "Apps", catchAll: true, appIds: [], color: ""}
             ]);
         }
 

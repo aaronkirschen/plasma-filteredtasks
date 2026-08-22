@@ -72,12 +72,12 @@ Item {
     }
 
     function sectionForApp(appId) {
-        var unsectionedIdx = -1;
+        var catchAllIdx = -1;
         for (var i = 0; i < layoutItems.length; i++) {
             var item = layoutItems[i];
             if (item.type !== "section") continue;
-            if (item.name === "__unsectioned") {
-                unsectionedIdx = i;
+            if (item.catchAll) {
+                catchAllIdx = i;
                 continue;
             }
             var ids = item.appIds || [];
@@ -85,7 +85,7 @@ Item {
                 if (ids[j] === appId) return i;
             }
         }
-        return unsectionedIdx;
+        return catchAllIdx;
     }
 
     // Check if an app should be excluded by exclusive mode
@@ -106,8 +106,7 @@ Item {
             return;
         }
 
-        var isUnsectioned = layoutItems[sectionIdx].name === "__unsectioned";
-        if (isUnsectioned && _isExcludedByOthers(task.appId)) {
+        if (layoutItems[sectionIdx].catchAll && _isExcludedByOthers(task.appId)) {
             task.visible = false;
             return;
         }
@@ -120,6 +119,15 @@ Item {
         }
         task.visible = true;
         task.sectionIndex = sectionIdx;
+
+        if (layoutItems[sectionIdx].catchAll) {
+            var ids = layoutItems[sectionIdx].appIds || [];
+            if (ids.indexOf(task.appId) < 0) {
+                ids.push(task.appId);
+                layoutItems[sectionIdx].appIds = ids;
+                Qt.callLater(persistLayout);
+            }
+        }
     }
 
     // Build sort key for a task within a section's appIds order
@@ -155,6 +163,8 @@ Item {
     }
 
     function reparentAllTasks() {
+        var catchAllUpdated = false;
+
         // Build a map of sectionIdx -> sorted task list
         var sectionTasks = {};
         for (var i = 0; i < tasks.taskRepeater.count; i++) {
@@ -166,8 +176,7 @@ Item {
                 continue;
             }
 
-            var isUnsectioned = layoutItems[sectionIdx].name === "__unsectioned";
-            if (isUnsectioned && _isExcludedByOthers(task.appId)) {
+            if (layoutItems[sectionIdx].catchAll && _isExcludedByOthers(task.appId)) {
                 task.visible = false;
                 continue;
             }
@@ -185,6 +194,17 @@ Item {
             var tasksInSection = sectionTasks[sectionIdx];
             var itemData = layoutItems[parseInt(sectionIdx)] || {};
             var appIds = itemData.appIds || [];
+
+            if (itemData.catchAll) {
+                for (var t = 0; t < tasksInSection.length; t++) {
+                    if (appIds.indexOf(tasksInSection[t].appId) < 0) {
+                        appIds.push(tasksInSection[t].appId);
+                        catchAllUpdated = true;
+                    }
+                }
+                if (catchAllUpdated) itemData.appIds = appIds;
+            }
+
             var orderMap = _buildOrderMap(appIds);
 
             _sortTasks(tasksInSection, orderMap);
@@ -210,6 +230,8 @@ Item {
                 _reorderIntoContainer(tasksInSection, container);
             }
         }
+
+        if (catchAllUpdated) Qt.callLater(persistLayout);
     }
 
     // Return the visual index of a task within its parent Flow (0-based)
@@ -230,6 +252,7 @@ Item {
         var itemData = layoutItems[sectionIdx];
         if (!itemData) return false;
         var ids = itemData.appIds || [];
+
         var fromIdx = ids.indexOf(appId);
         var toIdx = ids.indexOf(targetAppId);
         if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return false;
@@ -271,8 +294,6 @@ Item {
     property bool _dragDirty: false  // true when in-memory appIds changed during drag
 
     onLayoutItemsChanged: {
-        // Qt.callLater runs after all bindings settle (Repeater creates
-        // new containers) but before the next render frame — no flash.
         Qt.callLater(reparentAllTasks);
     }
 

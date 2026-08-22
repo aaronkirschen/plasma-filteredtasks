@@ -17,7 +17,7 @@ PlasmaExtras.Menu {
 
     readonly property var itemData: (tasksRoot && layoutIndex >= 0 && layoutIndex < tasksRoot.parsedLayout.length)
         ? tasksRoot.parsedLayout[layoutIndex] : {}
-    readonly property bool isUnsectioned: (itemData.name || "") === "__unsectioned"
+    readonly property bool isCatchAll: itemData.catchAll === true
 
     placement: {
         if (Plasmoid.location === PlasmaCore.Types.LeftEdge) {
@@ -40,7 +40,7 @@ PlasmaExtras.Menu {
     PlasmaExtras.MenuItem {
         text: i18n("Rename Section...")
         icon: "edit-rename"
-        visible: !sectionMenu.isUnsectioned
+        visible: !sectionMenu.isCatchAll
 
         onClicked: {
             var root = sectionMenu.tasksRoot;
@@ -72,7 +72,7 @@ PlasmaExtras.Menu {
     PlasmaExtras.MenuItem {
         text: i18n("Remove Section")
         icon: "edit-delete"
-        visible: !sectionMenu.isUnsectioned
+        visible: !sectionMenu.isCatchAll
 
         onClicked: {
             sectionMenu.tasksRoot.removeLayoutItem(sectionMenu.layoutIndex);
@@ -81,7 +81,7 @@ PlasmaExtras.Menu {
 
     PlasmaExtras.MenuItem {
         separator: true
-        visible: !sectionMenu.isUnsectioned
+        visible: !sectionMenu.isCatchAll
     }
 
     PlasmaExtras.MenuItem {

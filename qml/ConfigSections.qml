@@ -142,7 +142,7 @@ KCMUtils.SimpleKCM {
             catch (e) { parsed = []; }
         }
         if (parsed.length === 0) {
-            parsed = [{type: "section", name: "__unsectioned", appIds: [], color: ""}];
+            parsed = [{type: "section", name: "Apps", catchAll: true, appIds: [], color: ""}];
         }
         layoutItems = parsed;
         _loading = false;
@@ -152,9 +152,9 @@ KCMUtils.SimpleKCM {
     }
 
     // ── Helpers ──
-    readonly property bool hasUnsectioned: {
+    readonly property bool hasCatchAll: {
         for (var i = 0; i < layoutItems.length; i++) {
-            if (layoutItems[i].type === "section" && layoutItems[i].name === "__unsectioned") return true;
+            if (layoutItems[i].type === "section" && layoutItems[i].catchAll) return true;
         }
         return false;
     }
@@ -523,7 +523,7 @@ KCMUtils.SimpleKCM {
                 readonly property var itemData: root.layoutItems[origIndex] || {}
                 readonly property bool isSection: (itemData.type || "section") === "section"
                 readonly property bool isSpacer: itemData.type === "spacer"
-                readonly property bool isUnsectioned: isSection && itemData.name === "__unsectioned"
+                readonly property bool isCatchAll: isSection && itemData.catchAll === true
 
                 property bool dragActive: card.handleArea.drag.active
 
@@ -585,13 +585,13 @@ KCMUtils.SimpleKCM {
                     StandardCard {
                         id: card
                         width: parent.width
-                        name: delegateRoot.isUnsectioned ? i18n("Unsectioned") : (delegateRoot.itemData.name || "")
-                        nameEditable: !delegateRoot.isSpacer && !delegateRoot.isUnsectioned
-                        icon: delegateRoot.isUnsectioned ? "application-x-executable" : (delegateRoot.isSpacer ? "distribute-horizontal-x" : (delegateRoot.itemData.icon || "view-list-icons"))
+                        name: delegateRoot.isCatchAll ? i18n("Unsectioned") : (delegateRoot.itemData.name || "")
+                        nameEditable: !delegateRoot.isSpacer && !delegateRoot.isCatchAll
+                        icon: delegateRoot.isCatchAll ? "application-x-executable" : (delegateRoot.isSpacer ? "distribute-horizontal-x" : (delegateRoot.itemData.icon || "view-list-icons"))
                         itemColor: delegateRoot.itemData.color || ""
                         collapsed: root.collapsed
-                        collapsable: !delegateRoot.isSpacer && !delegateRoot.isUnsectioned
-                        extraContentVisible: !root.collapsed && delegateRoot.isSection && !delegateRoot.isUnsectioned
+                        collapsable: !delegateRoot.isSpacer && !delegateRoot.isCatchAll
+                        extraContentVisible: !root.collapsed && delegateRoot.isSection && !delegateRoot.isCatchAll
                         dragTarget: content
                         upEnabled: delegateRoot.origIndex > 0
                         downEnabled: delegateRoot.origIndex < root.layoutItems.length - 1
@@ -807,7 +807,7 @@ KCMUtils.SimpleKCM {
                 DropArea {
                     anchors.fill: parent
                     keys: ["appChip"]
-                    enabled: delegateRoot.isSection && !delegateRoot.isUnsectioned
+                    enabled: delegateRoot.isSection && !delegateRoot.isCatchAll
                     onEntered: card.outlineColor = Kirigami.Theme.highlightColor
                     onExited: card.outlineColor = Qt.binding(function() {
                         return delegateRoot.activeFocus ? Kirigami.Theme.highlightColor : (delegateRoot.isSpacer ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : Kirigami.Theme.disabledTextColor);
@@ -878,12 +878,12 @@ KCMUtils.SimpleKCM {
             }
 
             QQC2.Button {
-                visible: !root.hasUnsectioned
-                text: i18n("Add Unsectioned")
+                visible: !root.hasCatchAll
+                text: i18n("Add Default Section")
                 icon.name: "view-list-icons"
                 onClicked: {
                     var items = root.layoutItems.slice();
-                    items.push({type: "section", name: "__unsectioned", appIds: [], color: ""});
+                    items.push({type: "section", name: "Apps", catchAll: true, appIds: [], color: ""});
                     root.layoutItems = items;
                 }
             }
